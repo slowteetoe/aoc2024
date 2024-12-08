@@ -22,14 +22,16 @@ pub fn part_one(input: &str) -> Option<u64> {
         .iter()
         .map(|(target, nums)| {
             nums.iter()
-                .skip(1)
-                .fold(vec![nums[0]], |acc, n| {
-                    acc.iter()
-                        .flat_map(|a| generate(a, n))
-                        .filter(|n| n <= target)
-                        .collect_vec()
+                .fold(vec![], |mut acc, n| {
+                    if acc.is_empty() {
+                        acc.push(*n);
+                        acc
+                    } else {
+                        acc.iter().flat_map(|a| generate(*a, *n)).collect_vec()
+                    }
                 })
                 .into_iter()
+                .filter(|num| *num == *target)
                 .collect_vec()
         })
         .collect_vec();
@@ -37,12 +39,12 @@ pub fn part_one(input: &str) -> Option<u64> {
     Some(
         valid
             .into_iter()
-            .filter_map(|v| if v.is_empty() { None } else { Some(v[0]) })
+            .filter_map(|v| if !v.is_empty() { Some(v[0]) } else { None })
             .sum(),
     )
 }
 
-fn generate(a: &u64, b: &u64) -> Vec<u64> {
+fn generate(a: u64, b: u64) -> Vec<u64> {
     vec![a * b, a + b]
 }
 
