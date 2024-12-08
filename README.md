@@ -7,17 +7,20 @@ Solutions for [Advent of Code](https://adventofcode.com/) in [Rust](https://www.
 <!--- advent_readme_stars table --->
 
 <!--- benchmarking table --->
+
 ## Benchmarks
 
-| Day | Part 1 | Part 2 |
-| :---: | :---: | :---:  |
-| [Day 1](./src/bin/01.rs) | `39.6µs` | `75.1µs` |
+|           Day            |  Part 1   |  Part 2   |
+| :----------------------: | :-------: | :-------: |
+| [Day 1](./src/bin/01.rs) | `39.6µs`  | `75.1µs`  |
+| [Day 2](./src/bin/02.rs) | `122.3µs` |    `-`    |
 | [Day 3](./src/bin/03.rs) | `163.9µs` | `138.6µs` |
-| [Day 4](./src/bin/04.rs) | `174.2µs` | `70.5µs` |
-| [Day 5](./src/bin/05.rs) | `47.8ms` | `-` |
-| [Day 6](./src/bin/06.rs) | `385.8µs` | `-` |
+| [Day 4](./src/bin/04.rs) | `174.2µs` | `70.5µs`  |
+| [Day 5](./src/bin/05.rs) | `47.8ms`  |    `-`    |
+| [Day 6](./src/bin/06.rs) | `385.8µs` |    `-`    |
 
-**Total: 48.85ms**
+**Total: 48.97ms**
+
 <!--- benchmarking table --->
 
 ---
@@ -26,7 +29,7 @@ Solutions for [Advent of Code](https://adventofcode.com/) in [Rust](https://www.
 
 This template supports all major OS (macOS, Linux, Windows).
 
-###  📝 Create your repository
+### 📝 Create your repository
 
 1.  Open [the template repository](https://github.com/fspoettel/advent-of-code-rust) on Github.
 2.  Click [Use this template](https://github.com/fspoettel/advent-of-code-rust/generate) and create your repository.
@@ -68,7 +71,7 @@ Every [solution](https://github.com/fspoettel/advent-of-code-rust/blob/main/src/
 
 ### ➡️ Download input for a day
 
-> [!IMPORTANT] 
+> [!IMPORTANT]
 > This requires [installing the aoc-cli crate](#configure-aoc-cli-integration).
 
 You can automatically download puzzle input and description by either appending the `--download` flag to `scaffold` (e.g. `cargo scaffold 4 --download`) or with the separate `download` command:
@@ -147,9 +150,9 @@ The `cargo time` command allows you to benchmark your code and store timings in 
 
 `cargo time` has three modes of execution:
 
- 1. `cargo time` without arguments incrementally benches solutions that do not have been stored in the readme yet and skips the rest.
- 2. `cargo time <day>` benches a single solution.
- 3. `cargo time --all` benches all solutions.
+1.  `cargo time` without arguments incrementally benches solutions that do not have been stored in the readme yet and skips the rest.
+2.  `cargo time <day>` benches a single solution.
+3.  `cargo time --all` benches all solutions.
 
 By default, `cargo time` does not write to the readme. In order to do so, append the `--store` flag: `cargo time --store`.
 
@@ -185,9 +188,9 @@ cargo read <day>
 
 During december, the `today` shorthand command can be used to:
 
- - scaffold a solution for the current day
- - download its input
- - and read the puzzle
+-   scaffold a solution for the current day
+-   download its input
+-   and read the puzzle
 
 in one go.
 
