@@ -22,13 +22,9 @@ pub fn part_one(input: &str) -> Option<u64> {
         .iter()
         .map(|(target, nums)| {
             nums.iter()
-                .fold(vec![], |mut acc, n| {
-                    if acc.is_empty() {
-                        acc.push(*n);
-                        acc
-                    } else {
-                        acc.iter().flat_map(|a| generate(*a, *n)).collect_vec()
-                    }
+                .skip(1)
+                .fold(vec![nums[0]], |acc, n| {
+                    acc.iter().flat_map(|a| generate(*a, *n)).collect_vec()
                 })
                 .into_iter()
                 .filter(|num| *num == *target)
@@ -48,7 +44,7 @@ fn generate(a: u64, b: u64) -> Vec<u64> {
     vec![a * b, a + b]
 }
 
-fn generate_with_concat(a: u64, b: u64) -> Vec<u64> {
+fn generate_with_concat(target: u64, a: u64, b: u64) -> Vec<u64> {
     vec![
         (a.to_string() + b.to_string().as_ref())
             .parse::<u64>()
@@ -56,6 +52,9 @@ fn generate_with_concat(a: u64, b: u64) -> Vec<u64> {
         a * b,
         a + b,
     ]
+    .into_iter()
+    .filter(|n| *n <= target)
+    .collect()
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
@@ -64,15 +63,11 @@ pub fn part_two(input: &str) -> Option<u64> {
         .iter()
         .map(|(target, nums)| {
             nums.iter()
-                .fold(vec![], |mut acc, n| {
-                    if acc.is_empty() {
-                        acc.push(*n);
-                        acc
-                    } else {
-                        acc.iter()
-                            .flat_map(|a| generate_with_concat(*a, *n))
-                            .collect_vec()
-                    }
+                .skip(1)
+                .fold(vec![nums[0]], |acc, n| {
+                    acc.iter()
+                        .flat_map(|a| generate_with_concat(*target, *a, *n))
+                        .collect_vec()
                 })
                 .into_iter()
                 .filter(|num| *num == *target)
