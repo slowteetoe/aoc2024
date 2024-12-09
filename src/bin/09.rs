@@ -1,89 +1,150 @@
+use std::fmt::Display;
+
 advent_of_code::solution!(9);
 
-// First day this year that got me in that the example passes fine, but only because it stops at '9' and doesn't have to deal with 2+ digit numbers
-// I figured this naive approach of generating the strings would be really slow and probably wouldn't work for part 2 anyhow
+#[derive(Clone, PartialEq, Eq)]
+pub enum FileBlock {
+    File { id: u32 },
+    Empty,
+}
 
-// TODO think more
+impl Display for FileBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FileBlock::File { id } => {
+                write!(f, "{id}")
+            }
+            FileBlock::Empty => write!(f, "."),
+        }
+    }
+}
 
-fn decompress(input: &str) -> String {
+impl FileBlock {
+    pub fn new(input: &str) -> Vec<FileBlock> {
+        input.chars().fold(vec![], |mut acc, c| {
+            match c {
+                '.' => acc.push(FileBlock::Empty),
+                _ => acc.push(FileBlock::File {
+                    id: c.to_digit(10).unwrap(),
+                }),
+            };
+            acc
+        })
+    }
+}
+
+fn decompress(input: &str) -> Vec<FileBlock> {
     let mut id = 0;
     input
         .trim()
         .chars()
         .enumerate()
-        .fold(String::new(), |mut acc, (idx, ch)| {
-            let times = ch.to_digit(10).unwrap() as usize;
+        .fold(Vec::new(), |mut acc, (idx, ch)| {
+            let times = ch.to_digit(10).unwrap();
             if idx % 2 == 0 {
-                acc.push_str(&id.to_string().repeat(times));
+                for _ in 0..times {
+                    acc.push(FileBlock::File { id });
+                }
                 id += 1;
             } else {
-                acc.push_str(&".".repeat(times));
+                for _ in 0..times {
+                    acc.push(FileBlock::Empty)
+                }
             }
             acc
         })
 }
 
-fn condense(input: &str) -> String {
-    let mut de = input.to_string();
-    let l = de.len() - 1;
-    de.clone()
-        .chars()
-        .into_iter()
+fn defrag(mut filesystem: Vec<FileBlock>) -> Vec<FileBlock> {
+    let fs_len = filesystem.len() - 1;
+    filesystem
+        .clone()
+        .iter()
         .rev()
         .enumerate()
-        .for_each(|(idx, ch)| {
-            if let Some(n) = de.find(".") {
-                if n < l - idx {
-                    de.replace_range(n..=n, &ch.to_string());
-                    de.replace_range(l - idx..=l - idx, ".");
+        .for_each(|(idx, fb)| {
+            if *fb != FileBlock::Empty {
+                // find the first empty block in filesystem and swap it
+                if let Some(idx_empty_block) =
+                    filesystem.iter().position(|f| *f == FileBlock::Empty)
+                {
+                    if idx_empty_block < fs_len - idx {
+                        // swap
+                        filesystem[idx_empty_block] = fb.clone();
+                        filesystem[fs_len - idx] = FileBlock::Empty;
+                    }
                 }
             }
         });
-    de
+    filesystem
 }
 
-fn generate_checksum(input: &str) -> u64 {
-    input.chars().enumerate().fold(0u64, |acc, (idx, c)| {
-        if c == '.' {
-            acc
-        } else {
-            acc + (c.to_digit(10).unwrap() * idx as u32) as u64
-        }
-    })
+fn generate_checksum(input: &Vec<FileBlock>) -> u64 {
+    input
+        .iter()
+        .enumerate()
+        .fold(0u64, |acc, (idx, fb)| match fb {
+            FileBlock::Empty => acc,
+            FileBlock::File { id } => acc + (idx as u64 * *id as u64),
+        })
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
     let decompressed = decompress(input);
-    // println!("decompressed: {decompressed}");
-    let condensed = condense(&decompressed);
-    // println!("condensed: {condensed}");
-    let checksum = generate_checksum(&condensed);
+    // println!("decompressed: {}", decompressed.iter().join(""));
+    let defragged = defrag(decompressed);
+    // println!("defragged: {}", defragged.iter().join(""));
+    let checksum = generate_checksum(&defragged);
     Some(checksum)
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
+pub fn part_two(_input: &str) -> Option<u32> {
     None
 }
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+
     use super::*;
+
+    #[test]
+    fn test_fileblock() {
+        let fs = vec![
+            FileBlock::File { id: 0 },
+            FileBlock::File { id: 0 },
+            FileBlock::Empty,
+            FileBlock::Empty,
+            FileBlock::Empty,
+            FileBlock::File { id: 1 },
+            FileBlock::File { id: 1 },
+            FileBlock::File { id: 1 },
+        ];
+        println!("{:?}", fs.iter().join(""));
+    }
 
     #[test]
     fn test_decompress() {
         let result = decompress("2333133121414131402");
-        assert_eq!("00...111...2...333.44.5555.6666.777.888899", result);
+        let f = result.iter().join("");
+        assert_eq!("00...111...2...333.44.5555.6666.777.888899", f);
     }
 
     #[test]
-    fn test_condense() {
-        let result = condense("00...111...2...333.44.5555.6666.777.888899");
-        assert_eq!("0099811188827773336446555566..............", result);
+    fn test_defrag() {
+        let decompress_result = decompress("2333133121414131402");
+        let result = defrag(decompress_result);
+        assert_eq!(
+            "0099811188827773336446555566..............",
+            result.iter().join("")
+        );
     }
 
     #[test]
     fn test_checksum() {
-        let result = generate_checksum("0099811188827773336446555566..............");
+        let result = generate_checksum(&FileBlock::new(
+            "0099811188827773336446555566..............",
+        ));
         assert_eq!(1928, result);
     }
 
