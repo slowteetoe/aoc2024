@@ -1,7 +1,4 @@
-use std::{
-    borrow::BorrowMut,
-    collections::{BTreeMap, BTreeSet},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use itertools::Itertools;
 
@@ -38,52 +35,45 @@ fn parse_grid(input: &str) -> (Vec<Vec<char>>, BTreeMap<char, Vec<Point>>) {
 pub fn part_one(input: &str) -> Option<u32> {
     let (grid, antennas) = parse_grid(input);
 
-    let mut overall: BTreeSet<_> = BTreeSet::new();
-    for (_val, points) in antennas {
-        // println!("looking at {} which has points: {:?}", val, points);
-        for (a, b) in points.iter().tuple_combinations() {
-            let (dx, dy) = (a.0.abs_diff(b.0) as isize, a.1.abs_diff(b.1) as isize);
-            let dir = (a.0 - b.0, a.1 - b.1);
-            let mut antinodes = vec![];
-            match dir {
-                (x, y) if x > 0 && y > 0 => {
-                    // a down and right of b
-                    antinodes.push((a.0 + dx, a.1 + dy));
-                    antinodes.push((b.0 - dx, b.1 - dy));
-                }
-                (x, y) if x > 0 && y < 0 => {
-                    // a up and right of b
-                    antinodes.push((a.0 + dx, a.1 - dy));
-                    antinodes.push((b.0 - dx, b.1 + dy));
-                }
-                (x, y) if x < 0 && y > 0 => {
-                    // a down and left of b
-                    antinodes.push((a.0 - dx, a.1 + dy));
-                    antinodes.push((b.0 + dx, b.1 - dy));
-                }
-                (x, y) if x < 0 && y < 0 => {
-                    // a up and left of b
-                    antinodes.push((a.0 - dx, a.1 - dy));
-                    antinodes.push((b.0 + dx, b.1 + dy));
-                }
-                _ => unreachable!(),
-            }
-            let mut valid_nodes: BTreeSet<Point> = antinodes
-                .iter()
-                .filter_map(|(x, y)| {
-                    if *x >= 0 && *x < grid[0].len() as isize && *y >= 0 && *y < grid.len() as isize
-                    {
-                        Some((*x, *y))
-                    } else {
-                        None
+    let overall: BTreeSet<_> = antennas
+        .values()
+        .map(|points| {
+            points.iter().tuple_combinations().flat_map(|(a, b)| {
+                let (dx, dy) = (a.0.abs_diff(b.0) as isize, a.1.abs_diff(b.1) as isize);
+                let dir = (a.0 - b.0, a.1 - b.1);
+                match dir {
+                    (x, y) if x > 0 && y > 0 => {
+                        // a down and right of b
+                        vec![(a.0 + dx, a.1 + dy), (b.0 - dx, b.1 - dy)]
                     }
-                })
-                .collect();
-            // println!("valid antinodes: {:?}", &valid_nodes);
-            overall.append(valid_nodes.borrow_mut());
-        }
-    }
-    Some(overall.len() as u32)
+                    (x, y) if x > 0 && y < 0 => {
+                        // a up and right of b
+                        vec![(a.0 + dx, a.1 - dy), (b.0 - dx, b.1 + dy)]
+                    }
+                    (x, y) if x < 0 && y > 0 => {
+                        // a down and left of b
+                        vec![(a.0 - dx, a.1 + dy), (b.0 + dx, b.1 - dy)]
+                    }
+                    (x, y) if x < 0 && y < 0 => {
+                        // a up and left of b
+                        vec![(a.0 - dx, a.1 - dy), (b.0 + dx, b.1 + dy)]
+                    }
+                    _ => unreachable!(),
+                }
+            })
+        })
+        .flatten()
+        .collect();
+
+    let antinodes = overall
+        .iter()
+        .filter(|(x, y)| {
+            // filter out ones that are outside the grid boundaries
+            *x >= 0 && *x < grid[0].len() as isize && *y >= 0 && *y < grid.len() as isize
+        })
+        .count() as u32;
+
+    Some(antinodes)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
