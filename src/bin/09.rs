@@ -84,7 +84,8 @@ fn defrag(mut filesystem: Vec<FileBlock>) -> Vec<FileBlock> {
 }
 
 fn defrag_whole_files(filesystem: &mut Vec<FileBlock>) {
-    // go through the file system once, backwards, generating a list of file ids to number of blocks (and indices?)
+    // go through the file system once, backwards, generating a map of:
+    // file ids -> number of blocks
     let map = filesystem
         .clone()
         .iter()
@@ -98,61 +99,55 @@ fn defrag_whole_files(filesystem: &mut Vec<FileBlock>) {
             acc
         });
 
-    // let's just build up a map of <num spaces, starting indexes>
-    let mut holes = BTreeMap::new();
+    // keep track of (number of spaces available, starting index)
+    let mut holes = vec![];
     filesystem
         .iter()
         .enumerate()
-        .fold(0, |acc, (idx, current_block)| match current_block {
+        .fold((0, 0), |acc, (idx, current_block)| match current_block {
             FileBlock::File { id: _ } => {
-                if acc != 0 {
-                    holes
-                        .entry(acc)
-                        .and_modify(|val: &mut Vec<usize>| val.push(idx - acc))
-                        .or_insert(vec![idx - acc]);
+                if acc != (0, 0) {
+                    holes.push(acc);
                 };
-                0
+                (0, 0)
             }
-            FileBlock::Empty => acc + 1,
+            FileBlock::Empty => {
+                if acc == (0, 0) {
+                    (1, idx)
+                } else {
+                    (acc.0 + 1, acc.1)
+                }
+            }
         });
-
-    dbg!(&holes);
 
     // since we're using an indexmap, this is in order of largest file ids to smallest
     for (file_id, num_blocks) in map.iter() {
-        // UGH, thought I was being smart to use regex to find the holes, but neglected to think about how the multi-digit file ids would shift out the indexes
-        // leading to the problem I had originally - have to think of a different way to detect n- consecutive empty blocks
-
-        let current = filesystem.iter().join("");
-        let re = Regex::new(&format!(r"\.{{{}}}", num_blocks)).unwrap();
-        // dbg!(&re, &current);
-        if let Some(empty_blocks) = re.find(&current) {
-            println!("{}", filesystem.iter().take(100).join(""));
-            // println!("Found {:?}", m);
-            // find location of the first block of the id we're thinking about moving
+        if let Some(hole_index) = holes
+            .iter()
+            .position(|(num_holes, _)| num_holes >= num_blocks)
+        {
+            let hole = holes.get_mut(hole_index).unwrap();
             if let Some(file_start) = filesystem.iter().position(|b| match b {
                 FileBlock::File { id } if id == file_id => true,
                 _ => false,
             }) {
-                if empty_blocks.start() <= file_start {
-                    println!(
-                        "ok located {num_blocks} hole at {} to move {file_id} starting at {file_start}",
-                        empty_blocks.start()
-                    );
+                if hole.1 <= file_start {
                     for i in 0..*num_blocks as usize {
-                        filesystem[empty_blocks.start() + i] = filesystem[file_start + i].clone();
+                        filesystem[hole.1 + i] = filesystem[file_start + i].clone();
                         filesystem[file_start + i] = FileBlock::Empty;
                     }
-                    if filesystem.iter().join("") == current {
-                        panic!("update didn't take?!");
-                    }
                 }
+            }
+            if hole.0 == *num_blocks {
+                // hole completely filled, remove it
+                holes.remove(hole_index);
             } else {
-                println!("skipping {file_id} as there aren't any {num_blocks} block holes for it");
+                // partial hole remains
+                hole.0 -= num_blocks;
+                hole.1 += *num_blocks as usize;
             }
         }
     }
-    // filesystem
 }
 
 fn generate_checksum(input: &Vec<FileBlock>) -> u64 {
@@ -176,10 +171,8 @@ pub fn part_one(input: &str) -> Option<u64> {
 
 pub fn part_two(input: &str) -> Option<u64> {
     let mut decompressed = decompress(input);
-    // println!("decompressed: {}", decompressed.iter().join(""));
-    // let defragged =
     defrag_whole_files(&mut decompressed);
-    println!("defragged: {}", decompressed.iter().join(""));
+    // println!("defragged: {}", decompressed.iter().join(""));
     let checksum = generate_checksum(&decompressed);
     Some(checksum)
 }
