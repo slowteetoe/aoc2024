@@ -1,4 +1,8 @@
-use std::fmt::Display;
+use std::{collections::BTreeMap, fmt::Display};
+
+use indexmap::IndexMap;
+use itertools::Itertools;
+use regex::Regex;
 
 advent_of_code::solution!(9);
 
@@ -79,6 +83,78 @@ fn defrag(mut filesystem: Vec<FileBlock>) -> Vec<FileBlock> {
     filesystem
 }
 
+fn defrag_whole_files(filesystem: &mut Vec<FileBlock>) {
+    // go through the file system once, backwards, generating a list of file ids to number of blocks (and indices?)
+    let map = filesystem
+        .clone()
+        .iter()
+        .rev()
+        .filter(|fb| **fb != FileBlock::Empty)
+        .fold(IndexMap::<u32, u32>::new(), |mut acc, fb| {
+            match fb {
+                FileBlock::File { id } => acc.entry(*id).and_modify(|v| *v += 1).or_insert(1),
+                FileBlock::Empty => todo!(),
+            };
+            acc
+        });
+
+    // let's just build up a map of <num spaces, starting indexes>
+    let mut holes = BTreeMap::new();
+    filesystem
+        .iter()
+        .enumerate()
+        .fold(0, |acc, (idx, current_block)| match current_block {
+            FileBlock::File { id: _ } => {
+                if acc != 0 {
+                    holes
+                        .entry(acc)
+                        .and_modify(|val: &mut Vec<usize>| val.push(idx - acc))
+                        .or_insert(vec![idx - acc]);
+                };
+                0
+            }
+            FileBlock::Empty => acc + 1,
+        });
+
+    dbg!(&holes);
+
+    // since we're using an indexmap, this is in order of largest file ids to smallest
+    for (file_id, num_blocks) in map.iter() {
+        // UGH, thought I was being smart to use regex to find the holes, but neglected to think about how the multi-digit file ids would shift out the indexes
+        // leading to the problem I had originally - have to think of a different way to detect n- consecutive empty blocks
+
+        let current = filesystem.iter().join("");
+        let re = Regex::new(&format!(r"\.{{{}}}", num_blocks)).unwrap();
+        // dbg!(&re, &current);
+        if let Some(empty_blocks) = re.find(&current) {
+            println!("{}", filesystem.iter().take(100).join(""));
+            // println!("Found {:?}", m);
+            // find location of the first block of the id we're thinking about moving
+            if let Some(file_start) = filesystem.iter().position(|b| match b {
+                FileBlock::File { id } if id == file_id => true,
+                _ => false,
+            }) {
+                if empty_blocks.start() <= file_start {
+                    println!(
+                        "ok located {num_blocks} hole at {} to move {file_id} starting at {file_start}",
+                        empty_blocks.start()
+                    );
+                    for i in 0..*num_blocks as usize {
+                        filesystem[empty_blocks.start() + i] = filesystem[file_start + i].clone();
+                        filesystem[file_start + i] = FileBlock::Empty;
+                    }
+                    if filesystem.iter().join("") == current {
+                        panic!("update didn't take?!");
+                    }
+                }
+            } else {
+                println!("skipping {file_id} as there aren't any {num_blocks} block holes for it");
+            }
+        }
+    }
+    // filesystem
+}
+
 fn generate_checksum(input: &Vec<FileBlock>) -> u64 {
     input
         .iter()
@@ -98,8 +174,14 @@ pub fn part_one(input: &str) -> Option<u64> {
     Some(checksum)
 }
 
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    let mut decompressed = decompress(input);
+    // println!("decompressed: {}", decompressed.iter().join(""));
+    // let defragged =
+    defrag_whole_files(&mut decompressed);
+    println!("defragged: {}", decompressed.iter().join(""));
+    let checksum = generate_checksum(&decompressed);
+    Some(checksum)
 }
 
 #[cfg(test)]
@@ -157,6 +239,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(2858));
     }
 }
