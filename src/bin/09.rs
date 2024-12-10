@@ -57,28 +57,19 @@ fn decompress(input: &str) -> Vec<FileBlock> {
         })
 }
 
-fn defrag(mut filesystem: Vec<FileBlock>) -> Vec<FileBlock> {
-    let fs_len = filesystem.len() - 1;
-    filesystem
-        .clone()
-        .iter()
-        .rev()
-        .enumerate()
-        .for_each(|(idx, fb)| {
-            if *fb != FileBlock::Empty {
-                // find the first empty block in filesystem and swap it
-                if let Some(idx_empty_block) =
-                    filesystem.iter().position(|f| *f == FileBlock::Empty)
-                {
-                    if idx_empty_block < fs_len - idx {
-                        // swap
-                        filesystem[idx_empty_block] = fb.clone();
-                        filesystem[fs_len - idx] = FileBlock::Empty;
-                    }
-                }
+fn defrag(filesystem: &mut Vec<FileBlock>) {
+    let mut right = filesystem.len() - 1;
+
+    for n in 0..filesystem.len() {
+        if filesystem[n] == FileBlock::Empty && n < right {
+            // grab the rightmost non-empty block and swap it
+            while filesystem[right] == FileBlock::Empty {
+                right -= 1;
             }
-        });
-    filesystem
+            filesystem[n] = filesystem[right].clone();
+            filesystem[right] = FileBlock::Empty;
+        }
+    }
 }
 
 fn defrag_whole_files(filesystem: &mut Vec<FileBlock>) {
@@ -159,19 +150,18 @@ fn generate_checksum(input: &Vec<FileBlock>) -> u64 {
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
-    let decompressed = decompress(input);
+    let mut filesystem: Vec<FileBlock> = decompress(input);
     // println!("decompressed: {}", decompressed.iter().join(""));
-    let defragged = defrag(decompressed);
+    defrag(&mut filesystem);
     // println!("defragged: {}", defragged.iter().join(""));
-    let checksum = generate_checksum(&defragged);
+    let checksum = generate_checksum(&filesystem);
     Some(checksum)
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
-    let mut decompressed = decompress(input);
-    defrag_whole_files(&mut decompressed);
-    // println!("defragged: {}", decompressed.iter().join(""));
-    let checksum = generate_checksum(&decompressed);
+    let mut filesystem = decompress(input);
+    defrag_whole_files(&mut filesystem);
+    let checksum = generate_checksum(&filesystem);
     Some(checksum)
 }
 
@@ -205,11 +195,11 @@ mod tests {
 
     #[test]
     fn test_defrag() {
-        let decompress_result = decompress("2333133121414131402");
-        let result = defrag(decompress_result);
+        let mut filesystem = decompress("2333133121414131402");
+        defrag(&mut filesystem);
         assert_eq!(
             "0099811188827773336446555566..............",
-            result.iter().join("")
+            filesystem.iter().join("")
         );
     }
 
