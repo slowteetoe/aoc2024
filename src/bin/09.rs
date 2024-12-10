@@ -1,8 +1,6 @@
-use std::{collections::BTreeMap, fmt::Display};
+use std::fmt::Display;
 
 use indexmap::IndexMap;
-use itertools::Itertools;
-use regex::Regex;
 
 advent_of_code::solution!(9);
 
