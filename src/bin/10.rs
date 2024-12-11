@@ -72,6 +72,43 @@ impl Hiker {
             })
             .sum()
     }
+    fn find_trails_distinct(&self, trailsystem: &TrailSystem) -> u32 {
+        let trails = &trailsystem.trails;
+        trailsystem
+            .trailheads
+            .iter()
+            .map(|(x, y)| {
+                let mut n = 1;
+                let mut to_visit = vec![(*x, *y)];
+                while n <= 9 {
+                    let mut valid = vec![];
+                    for (col, row) in to_visit {
+                        // north
+                        if row > 0 && trails[row - 1][col] == n {
+                            valid.push((col, row - 1));
+                        }
+                        // east
+                        if col < trails[0].len() - 1 && trails[row][col + 1] == n {
+                            valid.push(((col + 1), row));
+                        }
+                        // south
+                        if row < trails.len() - 1 && trails[row + 1][col] == n {
+                            valid.push((col, (row + 1)));
+                        }
+                        // west
+                        if col > 0 && trails[row][col - 1] == n {
+                            valid.push(((col - 1), row));
+                        }
+                    }
+                    // dbg!(&n, &valid);
+                    n += 1;
+
+                    to_visit = valid;
+                }
+                to_visit.len() as u32
+            })
+            .sum()
+    }
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
@@ -83,7 +120,11 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let trailsystem = read_trails(input);
+    // dbg!(&trailsystem);
+    let hiker = Hiker {};
+    let valid_trail_count = hiker.find_trails_distinct(&trailsystem);
+    Some(valid_trail_count)
 }
 
 #[cfg(test)]
@@ -99,6 +140,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(81));
     }
 }
