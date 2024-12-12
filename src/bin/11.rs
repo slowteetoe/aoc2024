@@ -1,28 +1,30 @@
 use itertools::Itertools;
+use memoize::memoize;
 
 advent_of_code::solution!(11);
 
-fn blink(stones: Vec<u32>) -> Vec<u32> {
-    stones
-        .iter()
-        .flat_map(|stone| {
-            let s = format!("{stone}");
-            match *stone {
-                0 => vec![1],
-                _ if s.len() % 2 == 0 => {
-                    let (l, r) = s.split_at(s.len() / 2);
-                    vec![l.parse().unwrap(), r.parse().unwrap()]
-                }
-                n => vec![n * 2024],
-            }
-        })
-        .collect_vec()
+fn blink(stones: Vec<u64>) -> Vec<u64> {
+    stones.iter().flat_map(|stone| handle(*stone)).collect_vec()
 }
 
-fn read_stones(input: &str) -> Vec<u32> {
+#[memoize]
+fn handle(n: u64) -> Vec<u64> {
+    // TODO figure out how to use math instead of strings
+    let s = format!("{n}");
+    if n == 0 {
+        vec![1]
+    } else if s.len() % 2 == 0 {
+        let (l, r) = s.split_at(s.len() / 2);
+        vec![l.parse().unwrap(), r.parse().unwrap()]
+    } else {
+        vec![n * 2024]
+    }
+}
+
+fn read_stones(input: &str) -> Vec<u64> {
     input
         .split_ascii_whitespace()
-        .map(|c| c.parse::<u32>().unwrap())
+        .map(|c| c.parse().unwrap())
         .collect_vec()
 }
 
@@ -34,13 +36,18 @@ pub fn part_one(input: &str) -> Option<u32> {
     Some(stones.len() as u32)
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
+pub fn part_two(_input: &str) -> Option<u32> {
     None
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_double_zero() {
+        assert_eq!(0, "00".parse::<u32>().unwrap());
+    }
 
     #[test]
     fn test_part_one_subset() {
