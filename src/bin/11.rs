@@ -1,7 +1,10 @@
 use itertools::Itertools;
+use memoize::memoize;
 
 advent_of_code::solution!(11);
 
+// This was for part 1, but count_stones works better
+#[allow(unused)]
 fn blink(stones: Vec<u64>) -> Vec<u64> {
     stones
         .iter()
@@ -25,6 +28,24 @@ fn blink(stones: Vec<u64>) -> Vec<u64> {
         .collect_vec()
 }
 
+#[memoize]
+fn count_stones(stone: u64, depth: u8) -> u64 {
+    if depth == 0 {
+        return 1;
+    }
+    let depth = depth - 1;
+    if stone == 0 {
+        return count_stones(1, depth);
+    }
+    let num_digits = stone.ilog10() + 1;
+    if num_digits % 2 == 0 {
+        return count_stones(stone / 10u64.pow(num_digits / 2), depth)
+            + count_stones(stone % 10u64.pow(num_digits / 2), depth);
+    } else {
+        count_stones(stone * 2024, depth)
+    }
+}
+
 fn read_stones(input: &str) -> Vec<u64> {
     input
         .split_ascii_whitespace()
@@ -32,18 +53,15 @@ fn read_stones(input: &str) -> Vec<u64> {
         .collect_vec()
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
-    let mut stones = read_stones(input);
-    for _ in 0..25 {
-        stones = blink(stones);
-    }
-    Some(stones.len() as u32)
+pub fn part_one(input: &str) -> Option<u64> {
+    let stones = read_stones(input);
+    Some(stones.iter().map(|stone| count_stones(*stone, 25)).sum())
 }
 
-pub fn part_two(_input: &str) -> Option<u32> {
+pub fn part_two(input: &str) -> Option<u64> {
     // This has to be a counting or cycles problem, manipulating the vec is way too slow...
-
-    None
+    let stones = read_stones(input);
+    Some(stones.iter().map(|stone| count_stones(*stone, 75)).sum())
 }
 
 #[cfg(test)]
@@ -73,7 +91,7 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        // No examples for 75 blinks
-        assert_eq!(result, None);
+        // No examples for 75 blinks, double check the new algo works for 25
+        assert_eq!(result, Some(55312));
     }
 }
