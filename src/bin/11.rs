@@ -1,24 +1,28 @@
 use itertools::Itertools;
-use memoize::memoize;
 
 advent_of_code::solution!(11);
 
 fn blink(stones: Vec<u64>) -> Vec<u64> {
-    stones.iter().flat_map(|stone| handle(*stone)).collect_vec()
-}
-
-#[memoize]
-fn handle(n: u64) -> Vec<u64> {
-    // TODO figure out how to use math instead of strings
-    let s = format!("{n}");
-    if n == 0 {
-        vec![1]
-    } else if s.len() % 2 == 0 {
-        let (l, r) = s.split_at(s.len() / 2);
-        vec![l.parse().unwrap(), r.parse().unwrap()]
-    } else {
-        vec![n * 2024]
-    }
+    stones
+        .iter()
+        .flat_map(|n| {
+            if *n == 0 {
+                vec![1]
+            } else {
+                // ilog10() - 10 is 1, 100 is 2, 1000 is 3
+                // 123456.ilog10() = 5 + 1 = 6
+                let num_digits = n.ilog10() + 1;
+                // println!("looking at {n}, digits={num_digits}");
+                if num_digits % 2 == 0 {
+                    // 1000 = 10^3 (num digits / 2)
+                    // 123456 / 1000 = 123, 123456 % 1000 = 456
+                    vec![n / 10u64.pow(num_digits / 2), n % 10u64.pow(num_digits / 2)]
+                } else {
+                    vec![n * 2024]
+                }
+            }
+        })
+        .collect_vec()
 }
 
 fn read_stones(input: &str) -> Vec<u64> {
@@ -37,6 +41,8 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(_input: &str) -> Option<u32> {
+    // This has to be a counting or cycles problem, manipulating the vec is way too slow...
+
     None
 }
 
@@ -67,6 +73,7 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
+        // No examples for 75 blinks
         assert_eq!(result, None);
     }
 }
