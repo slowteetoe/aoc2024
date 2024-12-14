@@ -13,7 +13,7 @@ struct ClawMachine {
 }
 
 // TODO - Probably would have been cleaner to break out Nom ...
-fn parse_input(input: &str) -> Vec<ClawMachine> {
+fn parse_input(input: &str, prize_delta: u64) -> Vec<ClawMachine> {
     let button_regex = Regex::new(r"Button [A|B]: X\+(?<x>\d+), Y\+(?<y>\d+)").unwrap();
     let prize_regex = Regex::new(r"Prize: X=(?<x>\d+), Y=(?<y>\d+)").unwrap();
     input
@@ -35,7 +35,12 @@ fn parse_input(input: &str) -> Vec<ClawMachine> {
                 .expect("wanted button b");
             let prize = prize_regex
                 .captures(prize_def)
-                .map(|cap| U64Vec2::new(cap["x"].parse().unwrap(), cap["y"].parse().unwrap()))
+                .map(|cap| {
+                    U64Vec2::new(
+                        cap["x"].parse::<u64>().unwrap() + prize_delta,
+                        cap["y"].parse::<u64>().unwrap() + prize_delta,
+                    )
+                })
                 .expect("wanted prize");
             ClawMachine { a, b, prize }
         })
@@ -87,9 +92,9 @@ fn solve(machine: &ClawMachine) -> Option<(u64, u64)> {
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
-    let machines = parse_input(input);
+    let machines = parse_input(input, 0);
 
-    Some(machines.iter().fold(0u64, |acc, m| {
+    Some(machines.iter().fold(0, |acc, m| {
         let solution = solve(m);
         if solution.is_some() {
             let (a, b) = solution.unwrap();
@@ -100,8 +105,19 @@ pub fn part_one(input: &str) -> Option<u64> {
     }))
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    let d = 10_000_000_000_000u64;
+    let machines = parse_input(input, d);
+
+    Some(machines.iter().fold(0, |acc, m| {
+        let solution = solve(m);
+        if solution.is_some() {
+            let (a, b) = solution.unwrap();
+            acc + (a * 3 + b)
+        } else {
+            acc
+        }
+    }))
 }
 
 #[cfg(test)]
@@ -117,6 +133,7 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
+        // Ugh, no new test for part two
         assert_eq!(result, None);
     }
 }
