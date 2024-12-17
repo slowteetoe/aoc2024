@@ -2,12 +2,13 @@ use bmp::{
     consts::{BLACK, BLUE, RED, WHITE_SMOKE},
     Image,
 };
-use glam::IVec2;
+use glam::UVec2;
 use itertools::Itertools;
+use std::collections::VecDeque;
 
 advent_of_code::solution!(15);
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum Contents {
     EmptySpace,
     Wall,
@@ -17,14 +18,14 @@ enum Contents {
 
 #[derive(Debug)]
 struct Grid {
-    dim: IVec2,
+    dim: UVec2,
     contents: Vec<Contents>,
-    robot: IVec2,
+    robot: UVec2,
 }
 
 impl Grid {
     /// returns Some(current robot position) if able to move, None otherwise
-    fn execute(&mut self, instruction: &Movement) -> Option<IVec2> {
+    fn execute(&mut self, instruction: &Movement) -> Option<UVec2> {
         println!("Trying to move {:?} at {:?}", &instruction, self.robot);
         let robot_idx = self.to_index(&self.robot);
         match instruction {
@@ -38,7 +39,6 @@ impl Grid {
                     Some(self.robot)
                 } else if self.contents[up1] == Contents::Box
                     // need bounds check to make sure we stay on the same row
-                    && self.robot.y - 2  >= 0
                     && self.contents[self.xy_to_index(self.robot.x, self.robot.y - 2)] == Contents::EmptySpace
                 {
                     let up2 = self.xy_to_index(self.robot.x, self.robot.y - 2);
@@ -53,22 +53,28 @@ impl Grid {
                 }
             }
             Movement::Right => {
-                if self.contents[robot_idx + 1] == Contents::EmptySpace {
-                    self.contents[robot_idx] = Contents::EmptySpace;
-                    self.contents[robot_idx + 1] = Contents::Robot;
+                // if self.contents[robot_idx + 1] == Contents::EmptySpace {
+                //     self.contents[robot_idx] = Contents::EmptySpace;
+                //     self.contents[robot_idx + 1] = Contents::Robot;
+                //     self.robot.x += 1;
+                //     println!("moved robot right 1 to {:?}", self.robot);
+                //     Some(self.robot)
+                // } else if self.contents[robot_idx + 1] == Contents::Box
+                //     // need bounds check to make sure we stay on the same row
+                //     && self.robot.x + 2 < self.dim.x
+                //     && self.contents[robot_idx + 2] == Contents::EmptySpace
+                // {
+                //     self.contents[robot_idx] = Contents::EmptySpace;
+                //     self.contents[robot_idx + 1] = Contents::Robot;
+                //     self.contents[robot_idx + 2] = Contents::Box;
+                //     self.robot.x += 1;
+                //     println!("moved robot (and box) right 1 to {:?}", self.robot);
+                //     Some(self.robot)
+                // } else {
+                //     None
+                // }
+                if self.try_move_right(self.robot).is_some() {
                     self.robot.x += 1;
-                    println!("moved robot right 1 to {:?}", self.robot);
-                    Some(self.robot)
-                } else if self.contents[robot_idx + 1] == Contents::Box
-                    // need bounds check to make sure we stay on the same row
-                    && self.robot.x + 2 < self.dim.x
-                    && self.contents[robot_idx + 2] == Contents::EmptySpace
-                {
-                    self.contents[robot_idx] = Contents::EmptySpace;
-                    self.contents[robot_idx + 1] = Contents::Robot;
-                    self.contents[robot_idx + 2] = Contents::Box;
-                    self.robot.x += 1;
-                    println!("moved robot (and box) right 1 to {:?}", self.robot);
                     Some(self.robot)
                 } else {
                     None
@@ -107,7 +113,6 @@ impl Grid {
                     Some(self.robot)
                 } else if self.contents[robot_idx - 1] == Contents::Box
                     // need bounds check to make sure we stay on the same row
-                    && self.robot.x - 2 >= 0
                     && self.contents[robot_idx - 2] == Contents::EmptySpace
                 {
                     self.contents[robot_idx] = Contents::EmptySpace;
@@ -123,11 +128,45 @@ impl Grid {
         }
     }
 
-    fn xy_to_index(&self, x: i32, y: i32) -> usize {
+    fn try_move_right(&mut self, pos: UVec2) -> Option<UVec2> {
+        let mut queue = VecDeque::new();
+        let mut next_pos = pos.clone();
+        next_pos.x += 1;
+        let mut next = self.xy_to_index(next_pos.x, next_pos.y);
+        while next_pos.x < self.dim.x
+            && self.contents[next] != Contents::Wall
+            && self.contents[next] != Contents::EmptySpace
+        {
+            queue.push_front(self.contents[next]);
+            next_pos.x += 1;
+            next = self.xy_to_index(next_pos.x, next_pos.y);
+        }
+        if next_pos.x >= self.dim.x {
+            println!("ran out of room");
+            None
+        } else if self.contents[next] == Contents::Wall {
+            // ran out of room, nothing to do
+            println!("hit a wall after {:?}", queue);
+            None
+        } else {
+            // since we have a spot to put stuff, unwind the stack
+            while !queue.is_empty() {
+                next -= 1;
+                self.contents[next] = queue.pop_front().expect("missing content");
+            }
+            // move the robot itself, since it was on a robot square it's now empty
+            self.contents[next] = Contents::Robot;
+            self.contents[next - 1] = Contents::EmptySpace;
+            self.robot.x += 1;
+            Some(self.robot)
+        }
+    }
+
+    fn xy_to_index(&self, x: u32, y: u32) -> usize {
         (y as usize * self.dim.x as usize) + x as usize
     }
 
-    fn to_index(&self, pos: &IVec2) -> usize {
+    fn to_index(&self, pos: &UVec2) -> usize {
         ((pos.y as usize * self.dim.x as usize) + pos.x as usize)
             .try_into()
             .unwrap()
@@ -189,14 +228,14 @@ fn parse_input(input: &str) -> (Grid, Vec<Movement>) {
         });
     });
 
-    let dim = IVec2::new((parsed_grid.len() / grid_y) as i32, grid_y as i32);
+    let dim = UVec2::new((parsed_grid.len() / grid_y) as u32, grid_y as u32);
     let robot_pos = parsed_grid
         .iter()
         .position(|c| *c == Contents::Robot)
         .and_then(|pos| {
-            Some(IVec2::new(
-                pos as i32 % dim.x as i32,
-                pos as i32 / dim.y as i32,
+            Some(UVec2::new(
+                pos as u32 % dim.x as u32,
+                pos as u32 / dim.y as u32,
             ))
         })
         .expect("couldn't find robot");
@@ -225,9 +264,8 @@ fn parse_input(input: &str) -> (Grid, Vec<Movement>) {
 pub fn part_one(input: &str) -> Option<u32> {
     let (mut grid, instructions) = parse_input(input);
     instructions.iter().enumerate().for_each(|(idx, instr)| {
-        if grid.execute(instr).is_some() {
-            grid.create_image(&format!("{:04}", idx));
-        }
+        grid.execute(instr);
+        grid.create_image(&format!("{:04}", idx));
     });
     grid.create_image("end");
     None
