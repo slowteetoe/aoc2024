@@ -26,113 +26,108 @@ struct Grid {
 impl Grid {
     /// returns Some(current robot position) if able to move, None otherwise
     fn execute(&mut self, instruction: &Movement) -> Option<UVec2> {
-        println!("Trying to move {:?} at {:?}", &instruction, self.robot);
-        let robot_idx = self.to_index(&self.robot);
         match instruction {
-            Movement::Up => {
-                let up1 = self.xy_to_index(self.robot.x, self.robot.y - 1);
-                if self.contents[up1] == Contents::EmptySpace {
-                    self.contents[robot_idx] = Contents::EmptySpace;
-                    self.contents[up1] = Contents::Robot;
-                    self.robot.y -= 1;
-                    println!("moved robot up 1 to {:?}", self.robot);
-                    Some(self.robot)
-                } else if self.contents[up1] == Contents::Box
-                    // need bounds check to make sure we stay on the same row
-                    && self.contents[self.xy_to_index(self.robot.x, self.robot.y - 2)] == Contents::EmptySpace
-                {
-                    let up2 = self.xy_to_index(self.robot.x, self.robot.y - 2);
-                    self.contents[robot_idx] = Contents::EmptySpace;
-                    self.contents[up1] = Contents::Robot;
-                    self.contents[up2] = Contents::Box;
-                    self.robot.y -= 1;
-                    println!("moved robot (and box) up 1 to {:?}", self.robot);
-                    Some(self.robot)
-                } else {
-                    None
-                }
+            Movement::Up => self.try_move_up(self.robot),
+            Movement::Right => self.try_move_right(self.robot),
+            Movement::Down => self.try_move_down(self.robot),
+            Movement::Left => self.try_move_left(self.robot),
+        }
+    }
+
+    fn try_move_up(&mut self, pos: UVec2) -> Option<UVec2> {
+        let mut next_pos = pos.clone();
+        next_pos.y -= 1;
+        let mut next = self.xy_to_index(next_pos.x, next_pos.y);
+        let mut queue = VecDeque::new();
+        while next_pos.y > 0
+            && self.contents[next] != Contents::Wall
+            && self.contents[next] != Contents::EmptySpace
+        {
+            queue.push_front(self.contents[next]);
+            next_pos.y -= 1;
+            next = self.xy_to_index(next_pos.x, next_pos.y);
+        }
+        if next_pos.y < 1 || self.contents[next] == Contents::Wall {
+            // ran out of room, nothing to do
+            None
+        } else {
+            let delta = self.dim.x as usize; // one row vertically
+                                             // since we have a spot to put stuff, unwind the stack
+            while !queue.is_empty() {
+                self.contents[next] = queue.pop_front().expect("missing content");
+                next += delta;
             }
-            Movement::Right => {
-                // if self.contents[robot_idx + 1] == Contents::EmptySpace {
-                //     self.contents[robot_idx] = Contents::EmptySpace;
-                //     self.contents[robot_idx + 1] = Contents::Robot;
-                //     self.robot.x += 1;
-                //     println!("moved robot right 1 to {:?}", self.robot);
-                //     Some(self.robot)
-                // } else if self.contents[robot_idx + 1] == Contents::Box
-                //     // need bounds check to make sure we stay on the same row
-                //     && self.robot.x + 2 < self.dim.x
-                //     && self.contents[robot_idx + 2] == Contents::EmptySpace
-                // {
-                //     self.contents[robot_idx] = Contents::EmptySpace;
-                //     self.contents[robot_idx + 1] = Contents::Robot;
-                //     self.contents[robot_idx + 2] = Contents::Box;
-                //     self.robot.x += 1;
-                //     println!("moved robot (and box) right 1 to {:?}", self.robot);
-                //     Some(self.robot)
-                // } else {
-                //     None
-                // }
-                if self.try_move_right(self.robot).is_some() {
-                    self.robot.x += 1;
-                    Some(self.robot)
-                } else {
-                    None
-                }
+            // move the robot itself, since it was on a robot square it's now empty
+            self.contents[next] = Contents::Robot;
+            self.contents[next + delta] = Contents::EmptySpace;
+            self.robot.y -= 1;
+            Some(self.robot)
+        }
+    }
+    fn try_move_down(&mut self, pos: UVec2) -> Option<UVec2> {
+        let mut next_pos = pos.clone();
+        next_pos.y += 1;
+        let mut next = self.xy_to_index(next_pos.x, next_pos.y);
+        let mut queue = VecDeque::new();
+        while next_pos.y <= self.dim.y
+            && self.contents[next] != Contents::Wall
+            && self.contents[next] != Contents::EmptySpace
+        {
+            queue.push_front(self.contents[next]);
+            next_pos.y += 1;
+            next = self.xy_to_index(next_pos.x, next_pos.y);
+        }
+        if next_pos.y > self.dim.y || self.contents[next] == Contents::Wall {
+            None
+        } else {
+            let delta = self.dim.x as usize; // one row vertically
+                                             // since we have a spot to put stuff, unwind the stack
+            while !queue.is_empty() {
+                self.contents[next] = queue.pop_front().expect("missing content");
+                next -= delta;
             }
-            Movement::Down => {
-                let down1 = self.xy_to_index(self.robot.x, self.robot.y + 1);
-                if self.contents[down1] == Contents::EmptySpace {
-                    self.contents[robot_idx] = Contents::EmptySpace;
-                    self.contents[down1] = Contents::Robot;
-                    self.robot.y += 1;
-                    println!("moved robot down 1 to {:?}", self.robot);
-                    Some(self.robot)
-                } else if self.contents[down1] == Contents::Box
-                    // need bounds check to make sure we stay on the same row
-                    && self.robot.y + 2  < self.dim.y
-                    && self.contents[self.xy_to_index(self.robot.x, self.robot.y + 2)] == Contents::EmptySpace
-                {
-                    let down2 = self.xy_to_index(self.robot.x, self.robot.y + 2);
-                    self.contents[robot_idx] = Contents::EmptySpace;
-                    self.contents[down1] = Contents::Robot;
-                    self.contents[down2] = Contents::Box;
-                    self.robot.y += 1;
-                    println!("moved robot (and box) down 1 to {:?}", self.robot);
-                    Some(self.robot)
-                } else {
-                    None
-                }
+            // move the robot itself, since it was on a robot square it's now empty
+            self.contents[next] = Contents::Robot;
+            self.contents[next - delta] = Contents::EmptySpace;
+            self.robot.y += 1;
+            Some(self.robot)
+        }
+    }
+
+    fn try_move_left(&mut self, pos: UVec2) -> Option<UVec2> {
+        let mut next_pos = pos.clone();
+        next_pos.x -= 1;
+        let mut next = self.xy_to_index(next_pos.x, next_pos.y);
+        let mut queue = VecDeque::new();
+        while next_pos.x > 0
+            && self.contents[next] != Contents::Wall
+            && self.contents[next] != Contents::EmptySpace
+        {
+            queue.push_front(self.contents[next]);
+            next_pos.x -= 1;
+            next = self.xy_to_index(next_pos.x, next_pos.y);
+        }
+        if next_pos.x < 1 || self.contents[next] == Contents::Wall {
+            None
+        } else {
+            // since we have a spot to put stuff, unwind the stack
+            while !queue.is_empty() {
+                self.contents[next] = queue.pop_front().expect("missing content");
+                next += 1;
             }
-            Movement::Left => {
-                if self.contents[robot_idx - 1] == Contents::EmptySpace {
-                    self.contents[robot_idx] = Contents::EmptySpace;
-                    self.contents[robot_idx - 1] = Contents::Robot;
-                    self.robot.x -= 1;
-                    println!("moved robot left 1 to {:?}", self.robot);
-                    Some(self.robot)
-                } else if self.contents[robot_idx - 1] == Contents::Box
-                    // need bounds check to make sure we stay on the same row
-                    && self.contents[robot_idx - 2] == Contents::EmptySpace
-                {
-                    self.contents[robot_idx] = Contents::EmptySpace;
-                    self.contents[robot_idx - 1] = Contents::Robot;
-                    self.contents[robot_idx - 2] = Contents::Box;
-                    self.robot.x -= 1;
-                    println!("moved robot (and box) left 1 to {:?}", self.robot);
-                    Some(self.robot)
-                } else {
-                    None
-                }
-            }
+            // move the robot itself, since it was on a robot square it's now empty
+            self.contents[next] = Contents::Robot;
+            self.contents[next + 1] = Contents::EmptySpace;
+            self.robot.x -= 1;
+            Some(self.robot)
         }
     }
 
     fn try_move_right(&mut self, pos: UVec2) -> Option<UVec2> {
-        let mut queue = VecDeque::new();
         let mut next_pos = pos.clone();
         next_pos.x += 1;
         let mut next = self.xy_to_index(next_pos.x, next_pos.y);
+        let mut queue = VecDeque::new();
         while next_pos.x < self.dim.x
             && self.contents[next] != Contents::Wall
             && self.contents[next] != Contents::EmptySpace
@@ -141,18 +136,13 @@ impl Grid {
             next_pos.x += 1;
             next = self.xy_to_index(next_pos.x, next_pos.y);
         }
-        if next_pos.x >= self.dim.x {
-            println!("ran out of room");
-            None
-        } else if self.contents[next] == Contents::Wall {
-            // ran out of room, nothing to do
-            println!("hit a wall after {:?}", queue);
+        if next_pos.x >= self.dim.x || self.contents[next] == Contents::Wall {
             None
         } else {
             // since we have a spot to put stuff, unwind the stack
             while !queue.is_empty() {
-                next -= 1;
                 self.contents[next] = queue.pop_front().expect("missing content");
+                next -= 1;
             }
             // move the robot itself, since it was on a robot square it's now empty
             self.contents[next] = Contents::Robot;
@@ -164,12 +154,6 @@ impl Grid {
 
     fn xy_to_index(&self, x: u32, y: u32) -> usize {
         (y as usize * self.dim.x as usize) + x as usize
-    }
-
-    fn to_index(&self, pos: &UVec2) -> usize {
-        ((pos.y as usize * self.dim.x as usize) + pos.x as usize)
-            .try_into()
-            .unwrap()
     }
 
     fn create_image(&self, img_name: &str) {
@@ -200,6 +184,20 @@ impl Grid {
 
         let _ = img.save(format!("data/images/15-{img_name}.bmp"));
     }
+
+    fn gps_score(&self) -> u32 {
+        self.contents
+            .iter()
+            .enumerate()
+            .fold(0, |acc, (idx, contents)| {
+                if *contents == Contents::Box {
+                    let (y, x) = (idx as u32 / self.dim.x, idx as u32 % self.dim.x);
+                    acc + (100 * y) + x
+                } else {
+                    acc
+                }
+            })
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -214,7 +212,7 @@ fn parse_input(input: &str) -> (Grid, Vec<Movement>) {
     let (grid, instr) = input
         .split_once("\n\n")
         .expect("did not find grid/instructions");
-    dbg!(&grid);
+
     let mut parsed_grid = vec![];
     let mut grid_y = 0;
     grid.lines().for_each(|line| {
@@ -265,10 +263,11 @@ pub fn part_one(input: &str) -> Option<u32> {
     let (mut grid, instructions) = parse_input(input);
     instructions.iter().enumerate().for_each(|(idx, instr)| {
         grid.execute(instr);
-        grid.create_image(&format!("{:04}", idx));
+        if cfg!(test) {
+            grid.create_image(&format!("{:04}", idx));
+        }
     });
-    grid.create_image("end");
-    None
+    Some(grid.gps_score())
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
