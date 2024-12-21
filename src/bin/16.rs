@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use glam::IVec2;
-use pathfinding::prelude::dijkstra;
+use pathfinding::prelude::{astar_bag, dijkstra};
 // use tracing::debug;
 
 advent_of_code::solution!(16);
@@ -48,7 +48,7 @@ fn parse_grid(input: &str) -> Grid {
 #[tracing::instrument(skip(input))]
 pub fn part_one(input: &str) -> Option<u32> {
     let grid = parse_grid(input);
-    // debug!(?grid);
+    // interesting that a* is not faster than dijkstra for this puzzle, although I was using heuristic of 0 - maybe something more accurate would be faster?
     let result = dijkstra(
         &(grid.start, IVec2::X),
         |(p, dir)| {
@@ -67,8 +67,32 @@ pub fn part_one(input: &str) -> Option<u32> {
     Some(result.1)
 }
 
+#[tracing::instrument(skip(input))]
+// switch from dijkestra to a* since there's a astar_bag that returns ALL paths
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let grid = parse_grid(input);
+    // debug!(?grid);
+    let (result, _cost) = astar_bag(
+        &(grid.start, IVec2::X),
+        |(p, dir)| {
+            // can always change direction for 1000 pts
+            let mut successors = vec![((*p, dir.perp()), 1000), ((*p, -dir.perp()), 1000)];
+            // if there's no wall, we can continue on in the current direction
+            let next_pos = p + dir;
+            if !grid.walls.contains(&next_pos) {
+                successors.push(((next_pos, *dir), 1))
+            }
+            successors
+        },
+        |_| 0, // a* needs a heuristic, "approximation must not be greater than the real cost, or a wrong shortest path may be returned"
+        |(p, _)| *p == grid.end,
+    )
+    .expect("some path found");
+
+    let spots_to_sit = result
+        .flat_map(|path| path.into_iter().map(|(pos, _dir)| pos))
+        .collect::<HashSet<IVec2>>();
+    Some(spots_to_sit.len() as u32)
 }
 
 #[cfg(test)]
@@ -109,6 +133,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(64));
     }
 }
