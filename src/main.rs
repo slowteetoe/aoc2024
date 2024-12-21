@@ -41,6 +41,7 @@ mod args {
     }
 
     pub fn parse() -> Result<AppArguments, Box<dyn std::error::Error>> {
+        tracing_subscriber::fmt::init();
         let mut args = pico_args::Arguments::from_env();
 
         let app_args = match args.subcommand()?.as_deref() {
