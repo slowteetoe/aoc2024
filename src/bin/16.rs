@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use glam::IVec2;
-use pathfinding::prelude::{astar_bag, dijkstra};
+use pathfinding::prelude::{astar, astar_bag};
 // use tracing::debug;
 
 advent_of_code::solution!(16);
@@ -48,8 +48,8 @@ fn parse_grid(input: &str) -> Grid {
 #[tracing::instrument(skip(input))]
 pub fn part_one(input: &str) -> Option<u32> {
     let grid = parse_grid(input);
-    // interesting that a* is not faster than dijkstra for this puzzle, although I was using heuristic of 0 - maybe something more accurate would be faster?
-    let result = dijkstra(
+    // interesting that a* is not faster than dijkstra for this puzzle
+    let result = astar(
         &(grid.start, IVec2::X),
         |(p, dir)| {
             // can always change direction for 1000 pts
@@ -61,6 +61,7 @@ pub fn part_one(input: &str) -> Option<u32> {
             }
             successors
         },
+        |&(p, _dir)| grid.end.x.abs_diff(p.x) + grid.end.y.abs_diff(p.y), // it really doesn't seem to matter much for these grid sizes whether using manhattan distance or a flat 0
         |(p, _)| *p == grid.end,
     )
     .expect("some path found");
