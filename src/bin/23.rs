@@ -68,6 +68,7 @@ pub fn part_one(input: &str) -> Option<u32> {
 
 #[instrument(skip(_input))]
 pub fn part_two(_input: &str) -> Option<u32> {
+    // now we need the largest connected component, and to know which vertices those are
     None
 }
 
