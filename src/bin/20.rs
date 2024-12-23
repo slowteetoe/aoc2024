@@ -85,7 +85,11 @@ pub fn part_one(input: &str) -> Option<u32> {
     let eligible_walls = &grid
         .walls
         .iter()
-        .filter(|p| p.x != 0 && p.x != grid.dim.x && p.y != 0 && p.y != grid.dim.y)
+        .filter(|p|
+            // it's not an outside wall
+            p.x > 0 && p.x < grid.dim.x && p.y > 0 && p.y < grid.dim.y &&
+            // there has to at least be one open space around it or our 2 picosecond cheat is pointless
+            DIRECTIONS.iter().map(|d| *p + d).any(|new_pos| !grid.walls.contains(&new_pos)))
         .collect_vec();
 
     let target_savings = if cfg!(test) { 2 } else { 100 };
