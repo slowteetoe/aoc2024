@@ -18,17 +18,15 @@ impl Iterator for Buyer {
     type Item = u128;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let result = self.secret * 64;
-        self.secret ^= result;
+        self.secret = (self.secret << 6) ^ self.secret;
         self.secret = self.secret.rem_euclid(16777216);
 
-        let result = self.secret / 32;
-        self.secret ^= result;
+        self.secret = (self.secret >> 5) ^ self.secret;
         self.secret = self.secret.rem_euclid(16777216);
 
-        let result = self.secret * 2048;
-        self.secret ^= result;
+        self.secret = (self.secret << 11) ^ self.secret;
         self.secret = self.secret.rem_euclid(16777216);
+
         Some(self.secret)
     }
 }
