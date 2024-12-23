@@ -35,13 +35,7 @@ pub fn part_one(input: &str) -> Option<u64> {
     Some(
         input
             .lines()
-            .map(|line| {
-                Buyer(
-                    line.trim()
-                        .parse::<u64>()
-                        .expect("should have parsed a u64"),
-                )
-            })
+            .map(|line| Buyer(line.trim().parse().expect("should have parsed a u64")))
             .map(|mut b| b.nth(1999).unwrap().0)
             .sum(),
     )
