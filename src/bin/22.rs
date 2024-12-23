@@ -10,10 +10,10 @@ impl Iterator for Buyer {
         self.mix(self.0 << 6); // nope, not faster than just self.0 * 64
         self.prune();
 
-        self.mix(self.0 >> 5);
+        self.mix(self.0 >> 5); // nope, not faster than just self.0 / 32
         self.prune();
 
-        self.mix(self.0 << 11);
+        self.mix(self.0 << 11); // nope, not faster than just self.0 * 2048
         self.prune();
 
         Some(*self)
@@ -42,7 +42,7 @@ pub fn part_one(input: &str) -> Option<u64> {
                         .expect("should have parsed a u64"),
                 )
             })
-            .map(|b| b.skip(1999).next().unwrap().0)
+            .map(|mut b| b.nth(1999).unwrap().0)
             .sum(),
     )
     // debug!(?twothousandth);
