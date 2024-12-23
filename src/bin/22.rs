@@ -1,5 +1,8 @@
 advent_of_code::solution!(22);
 
+use itertools::Itertools;
+use rayon::prelude::*;
+
 #[derive(Copy, Clone, PartialEq, Eq)]
 struct Buyer(u64);
 
@@ -32,13 +35,16 @@ impl Buyer {
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
-    Some(
-        input
-            .lines()
-            .map(|line| Buyer(line.trim().parse().expect("should have parsed a u64")))
-            .map(|mut b| b.nth(1999).unwrap().0)
-            .sum(),
-    )
+    let buyers = input
+        .lines()
+        .map(|line| Buyer(line.trim().parse().expect("should have parsed a u64")))
+        .collect_vec();
+
+    let result = buyers
+        .par_iter()
+        .map(|b| b.skip(1999).next().unwrap().0)
+        .sum();
+    Some(result)
     // debug!(?twothousandth);
 }
 
