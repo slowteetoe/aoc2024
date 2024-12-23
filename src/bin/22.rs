@@ -1,75 +1,84 @@
-use itertools::Itertools;
-use tracing::{debug, instrument};
-
 advent_of_code::solution!(22);
 
-#[derive(Debug)]
-struct Buyer {
-    secret: u128,
+#[derive(Copy, Clone, PartialEq, Eq)]
+struct Buyer(u64);
+
+impl Iterator for Buyer {
+    type Item = Self;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.mix(self.0 << 6); // nope, not faster than just self.0 * 64
+        self.prune();
+
+        self.mix(self.0 >> 5);
+        self.prune();
+
+        self.mix(self.0 << 11);
+        self.prune();
+
+        Some(*self)
+    }
 }
 
 impl Buyer {
-    fn new(seed: u128) -> Self {
-        Self { secret: seed }
+    fn mix(&mut self, val: u64) {
+        self.0 ^= val;
+    }
+
+    fn prune(&mut self) {
+        // self.0 = self.0.rem_euclid(16777216);
+        self.0 %= 16777216; // no faster than rem_euclid
     }
 }
 
-impl Iterator for Buyer {
-    type Item = u128;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.secret = (self.secret << 6) ^ self.secret;
-        self.secret = self.secret.rem_euclid(16777216);
-
-        self.secret = (self.secret >> 5) ^ self.secret;
-        self.secret = self.secret.rem_euclid(16777216);
-
-        self.secret = (self.secret << 11) ^ self.secret;
-        self.secret = self.secret.rem_euclid(16777216);
-
-        Some(self.secret)
-    }
+pub fn part_one(input: &str) -> Option<u64> {
+    Some(
+        input
+            .lines()
+            .map(|line| {
+                Buyer(
+                    line.trim()
+                        .parse::<u64>()
+                        .expect("should have parsed a u64"),
+                )
+            })
+            .map(|b| b.skip(1999).next().unwrap().0)
+            .sum(),
+    )
+    // debug!(?twothousandth);
 }
 
-#[instrument]
-pub fn part_one(input: &str) -> Option<u128> {
-    let buyers = input.lines().map(|line| {
-        Buyer::new(
-            line.trim()
-                .parse::<u128>()
-                .expect("should have parsed a u128"),
-        )
-    });
-    let twothousandth = buyers.map(|b| b.skip(1999).next().unwrap()).collect_vec();
-    debug!(?twothousandth);
-
-    Some(twothousandth.iter().sum())
-}
-
-pub fn part_two(input: &str) -> Option<u32> {
+pub fn part_two(_input: &str) -> Option<u32> {
     None
 }
 
 #[cfg(test)]
 mod tests {
-    use tracing_test::traced_test;
+    use itertools::Itertools;
 
     use super::*;
 
     #[test]
     fn test_example() {
-        let buyer = Buyer::new(123);
-        let actual = buyer.take(10).collect_vec();
+        let buyer = Buyer(123);
+        let actual = buyer.take(10).map(|b| b.0).collect_vec();
         assert_eq!(
             vec![
-                15887950, 16495136, 527345, 704524, 1553684, 12683156, 11100544, 12249484, 7753432,
+                15887950u64,
+                16495136,
+                527345,
+                704524,
+                1553684,
+                12683156,
+                11100544,
+                12249484,
+                7753432,
                 5908254,
             ],
             actual
         );
     }
 
-    #[traced_test]
     #[test]
     fn test_part_one() {
         let result = part_one(&advent_of_code::template::read_file("examples", DAY));
