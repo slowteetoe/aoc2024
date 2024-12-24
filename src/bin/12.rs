@@ -75,6 +75,33 @@ fn calculate_cost(regions: Vec<HashSet<IVec2>>) -> u32 {
         .sum()
 }
 
+fn calculate_cost_part2(regions: Vec<HashSet<IVec2>>) -> u32 {
+    regions
+        .iter()
+        .map(|region| region.len() as u32 * number_sides(&region))
+        .sum()
+}
+
+/// insight: the number of sides a shape has is equal to the number of corners
+/// we just have to figure out how to count corners...
+fn number_sides(region: &HashSet<IVec2>) -> u32 {
+    let tmp: HashSet<(i32, i32)> = region.iter().map(|p| (p.x, p.y)).collect();
+
+    region.iter().map(|p| (p.x, p.y)).fold(0u32, |acc, (x, y)| {
+        let up = tmp.contains(&(x, y - 1));
+        let up_right = tmp.contains(&(x + 1, y - 1));
+        let right = tmp.contains(&(x + 1, y));
+        let down_right = tmp.contains(&(x + 1, y + 1));
+        let down = tmp.contains(&(x, y + 1));
+        let down_left = tmp.contains(&(x - 1, y + 1));
+        let left = tmp.contains(&(x - 1, y));
+        let up_left = tmp.contains(&(x - 1, y - 1));
+
+        // match (up, up_right, right, down_right, down, down_left, left, up_left) {
+        acc
+    })
+}
+
 fn perimeter(region: &HashSet<IVec2>) -> u32 {
     region.iter().fold(0u32, |mut acc, pos| {
         acc += 4;
@@ -97,8 +124,13 @@ pub fn part_one(input: &str) -> Option<u32> {
     Some(cost)
 }
 
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u32> {
+    let grid = parse_input(input);
+
+    let regions = process_grid(grid);
+
+    let cost = calculate_cost_part2(regions);
+    Some(cost)
 }
 
 #[cfg(test)]
@@ -129,6 +161,6 @@ EEEC"#,
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(1206));
     }
 }
