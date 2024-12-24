@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use memoize::memoize;
-use tracing::{debug, instrument};
+use tracing::instrument;
 
 advent_of_code::solution!(19);
 
@@ -29,37 +29,47 @@ fn parse_input(input: &str) -> Problem {
 
 #[memoize]
 #[instrument]
-fn possible_to_construct(design: String, patterns: Vec<String>) -> u32 {
+fn possible_to_construct(design: String, patterns: Vec<String>, count: bool) -> u64 {
     if design == "" {
         return 1;
     }
-    let ret: u32 = patterns
+    let ret: u64 = patterns
         .iter()
         .filter(|p| design.starts_with(*p))
         .map(|p| {
             let smaller = design[p.len()..].to_owned();
-            possible_to_construct(smaller, patterns.clone())
+            possible_to_construct(smaller, patterns.clone(), count)
         })
         .sum();
-    if ret > 0 {
-        1
+    if !count {
+        if ret > 0 {
+            1
+        } else {
+            0
+        }
     } else {
-        0
+        ret
     }
 }
 
 #[instrument(skip(input))]
-pub fn part_one(input: &str) -> Option<u32> {
+pub fn part_one(input: &str) -> Option<u64> {
     let Problem { patterns, designs } = parse_input(input);
 
-    let valid = designs.iter().fold(0u32, |acc, d| {
-        acc + possible_to_construct(d.clone(), patterns.clone())
+    let valid = designs.iter().fold(0u64, |acc, d| {
+        acc + possible_to_construct(d.clone(), patterns.clone(), false)
     });
     Some(valid)
 }
 
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    let Problem { patterns, designs } = parse_input(input);
+
+    let valid = designs.iter().fold(0u64, |acc, d| {
+        acc + possible_to_construct(d.clone(), patterns.clone(), true)
+    });
+    // 4280423814 was too low
+    Some(valid)
 }
 
 #[cfg(test)]
@@ -78,6 +88,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(16));
     }
 }
