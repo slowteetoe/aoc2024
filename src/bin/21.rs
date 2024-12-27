@@ -1,49 +1,16 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, iter::once};
 
-use glam::IVec2;
 use itertools::Itertools;
 use memoize::memoize;
 use pathfinding::prelude::astar;
+use petgraph::{
+    dot::{Config, Dot},
+    graph::DiGraph,
+    prelude::DiGraphMap,
+};
 use tracing::{debug, instrument};
 
 advent_of_code::solution!(21);
-
-#[derive(Debug)]
-struct NumericKeypad {
-    cur: char,
-    keys: BTreeMap<char, IVec2>,
-}
-
-impl NumericKeypad {
-    fn new() -> Self {
-        let mut keys = BTreeMap::new();
-        keys.insert('7', IVec2::new(0, 0));
-        keys.insert('8', IVec2::new(1, 0));
-        keys.insert('9', IVec2::new(2, 0));
-        keys.insert('4', IVec2::new(0, 1));
-        keys.insert('5', IVec2::new(1, 1));
-        keys.insert('6', IVec2::new(2, 1));
-        keys.insert('1', IVec2::new(0, 2));
-        keys.insert('2', IVec2::new(1, 2));
-        keys.insert('3', IVec2::new(2, 2));
-        keys.insert('0', IVec2::new(1, 3));
-        keys.insert('A', IVec2::new(2, 3));
-        Self { cur: 'A', keys }
-    }
-
-    /// take a character from 0..A and return the directional movements needed for that input
-    fn translate(&mut self, c: char) -> Vec<char> {
-        // tedious (10^10 entries?) but will work
-        // match (self.pos, c) {
-        //     ('A', 'A') => vec!['A'],
-        //     ('A', '0') => vec!['<', 'A'],
-        //     ('A', '3') => vec!['^', 'A'],
-        //     ('A', '2') => vec!['^', '<', 'A'],
-        //     _ => unreachable!(),
-        // }
-        todo!()
-    }
-}
 
 /// yeah, this is probably not the best either...  maybe building up reachable paths from each char would be easier
 #[memoize]
@@ -75,7 +42,7 @@ fn next_step_on_numeric_keypad(start: char, end: char) -> Vec<char> {
             'X' => vec![],
             _ => unreachable!(),
         },
-        |_| 1,
+        |_| 0,
         |p| p.0 == end,
     )
     .expect("should have been a path");
@@ -96,7 +63,7 @@ fn next_step_on_directional_keypad(start: char, end: char) -> Vec<char> {
             'X' => vec![],
             _ => unreachable!(),
         },
-        |_| 1,
+        |_| 0,
         |p| p.0 == end,
     )
     .expect("should have been a path");
@@ -110,72 +77,122 @@ fn parse(input: &str) -> Vec<Vec<char>> {
         .collect()
 }
 
+fn code_to_numerical_movements(code: &Vec<char>) -> String {
+    let mut movements = vec![];
+    once(&'A')
+        .chain(code)
+        .tuple_windows()
+        .for_each(|(start, end)| {
+            if start == end {
+                movements.push('A');
+            } else {
+                let mut next = next_step_on_numeric_keypad(*start, *end);
+                // debug!("going from {start} to {end} is {:?}", next);
+                next = next[1..].to_vec();
+                next.push('A');
+                movements.append(&mut next);
+            }
+        });
+    movements.iter().join("")
+}
+
+fn numerical_to_directional_movements(numerical_movements: &str) -> String {
+    let m = "A".to_owned() + numerical_movements;
+    let mut movements = vec![];
+    m.chars().tuple_windows().for_each(|(start, end)| {
+        let mut next = next_step_on_directional_keypad(start, end);
+        // wth?
+        // println!("going from {end} to {start} is {:?}", next);
+        if next.len() != 0 {
+            next = next[1..].to_vec();
+        }
+        next.push('A');
+        movements.append(&mut next);
+    });
+    movements.iter().join("")
+}
+
+fn push_buttons(input: Vec<char>) -> String {
+    // let mut nodes = BTreeMap::<char, u32>::new();
+    // nodes.insert('A', 0);
+    // nodes.insert('^', 1);
+    // nodes.insert('>', 2);
+    // nodes.insert('v', 3);
+    // nodes.insert('<', 4);
+    let g = DiGraphMap::<&str, ()>::from_edges(&[
+        // (0, 1),
+        // (0, 2), // A
+        // (1, 3),
+        // (1, 0), // ^
+        // (2, 0),
+        // (2, 3), // >
+        // (3, 4),
+        // (3, 1),
+        // (3, 2), // v
+        // (4, 3), // <
+        ("A", "^"),
+        ("A", ">"),
+        ("^", "A"),
+        ("^", "v"),
+        (">", "A"),
+        (">", "v"),
+        ("v", "<"),
+        ("v", "^"),
+        ("v", ">"),
+        ("<", "v"),
+    ]);
+    println!("{:?}", Dot::new(&g));
+    let mut curr = g.nodes().find(|n| *n == "A").expect("root node");
+    let output: Vec<_> = input
+        .iter()
+        .map(|c| {
+            let c = c.to_string();
+            if c == "A" {
+                curr
+            } else {
+                let mut outbound = g.edges_directed(curr, petgraph::Direction::Outgoing);
+                println!("on {}, looking at {:?} for {}", curr, outbound, c);
+                if let Some(outbound_node) = outbound.find(|e| e.0 == curr && e.1 == c) {
+                    curr = outbound_node.1;
+                    outbound_node.0
+                } else {
+                    panic!("nope")
+                }
+            }
+        })
+        .collect();
+    output.iter().join("")
+}
+
 #[instrument(skip(input))]
 pub fn part_one(input: &str) -> Option<u32> {
     let codes = parse(input);
-    let numeric_movements = codes
+    let solutions = codes
         .iter()
-        // .take(1)
-        .map(|c| {
-            let mut c = c.clone();
-            c.insert(0, 'A');
-            c
+        .take(1)
+        .map(|code| (code, code_to_numerical_movements(&code)))
+        .inspect(|(code, m)| {
+            println!("{:?}: {:?}", code, m);
         })
-        .map(|code| {
-            let mut movements = vec![];
-            code.iter().tuple_windows().for_each(|(start, end)| {
-                let mut next = next_step_on_numeric_keypad(*start, *end);
-                debug!("going from {start} to {end} is {:?}", next);
-                next = next[1..].to_vec();
-                next.push('A');
-                movements.append(&mut next);
-            });
-            movements.iter().join("")
+        .map(|(code, m)| (code, numerical_to_directional_movements(&m)))
+        .inspect(|(code, m)| {
+            println!("{:?}: {:?}", code, m);
         })
-        .collect_vec();
-    // debug!(?numeric_movements);
-    // translate the numeric_movements into movements on the directional keypad
-    let directional_movements = numeric_movements
-        .iter()
-        .map(|m| {
-            let m = "A".to_owned() + m.as_str();
-            let mut movements = vec![];
-            m.chars().tuple_windows().for_each(|(start, end)| {
-                let mut next = next_step_on_directional_keypad(start, end);
-                // wth?
-                debug!("going from {end} to {start} is {:?}", next);
-                next = next[1..].to_vec();
-                next.push('A');
-                movements.append(&mut next);
-            });
-            movements.iter().join("")
-        })
-        .collect_vec();
-    // debug!(?directional_movements);
-    // 3rd robot
-    let third = directional_movements
-        .iter()
-        .map(|m| {
-            let m = "A".to_owned() + m.as_str();
-            let mut movements = vec![];
-            m.chars().tuple_windows().for_each(|(start, end)| {
-                let mut next = next_step_on_directional_keypad(start, end);
-                // wth?
-                println!("going from {end} to {start} is {:?}", next);
-                next = next[1..].to_vec();
-                next.push('A');
-                movements.append(&mut next);
-            });
-            movements.iter().join("")
+        .map(|(code, m)| (code, numerical_to_directional_movements(&m)))
+        .inspect(|(code, m)| {
+            println!("{:?}: {:?}", code, m);
         })
         .collect_vec();
     // debug!(?third);
-    let solutions = (0..third.iter().len())
-        .map(|n| (codes[n].clone(), third[n].clone()))
-        .collect::<BTreeMap<_, _>>();
+    // let solutions = (0..solutions.iter().len())
+    //     .map(|n| (codes[n].clone(), solutions[n].clone()))
+    //     .collect::<BTreeMap<_, _>>();
     // debug!(?solutions);
     let complexity: u32 = solutions
         .iter()
+        .inspect(|(code, seq)| {
+            println!("{:?} => {:?}", code, seq);
+        })
         .map(|(code, seq)| {
             (
                 code.iter()
@@ -201,9 +218,60 @@ pub fn part_two(input: &str) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
     use tracing_test::traced_test;
 
     use super::*;
+
+    // seems like we always generate the same shortest path,
+    // even though there are several equivalent paths
+    #[rstest]
+    #[case("029A", "<A^A^^>AvvvA")]
+    #[case("980A", "^^^A<AvvvA>A")]
+    #[case("179A", "<^<A^^A>>AvvvA")]
+    #[case("456A", "<^^<A>A>AvvA")]
+    #[case("379A", "^A^^<<A>>AvvvA")]
+    #[traced_test]
+    #[test]
+    fn test_code_to_numerical_movements(#[case] code: &str, #[case] expected: &str) {
+        let code = code.to_owned().chars().collect_vec();
+        let result = code_to_numerical_movements(&code);
+        assert_eq!(result, expected);
+        assert_eq!(expected.len(), result.len())
+    }
+
+    #[test]
+    fn test_pushing_buttons() {
+        let code = "<A^A^^>AvvvA".chars().collect_vec();
+        let result = push_buttons(code);
+        assert_eq!("", result);
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_numerical_to_movements() {
+        let result = numerical_to_directional_movements("<A^A>^^AvvvA");
+        // these are both valid paths
+        assert!([
+            "v<<A>^>A<A>A<AAv>A^Av<AAA^>A",
+            "v<<A>>^A<A>AvA<^AA>A<vAAA>^A",
+            "v<<A>^>A<A>AvA<^AA>Av<AAA^>A"
+        ]
+        .contains(&result.as_str()));
+        // assert_eq!(result, "v<<A>>^A<A>AvA<^AA>A<vAAA>^A")
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_second_round_of_movements() {
+        let result = numerical_to_directional_movements("v<<A>>^A<A>AvA<^AA>A<vAAA>^A");
+        // equivalent paths
+        assert!([
+            "v<A<AA>^>AvAA<^A>Av<<A>^>AvA^Av<A^>Av<<A>^A>AAvA^Av<<A>A^>AAAvA<^A>A",
+            "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A",
+        ]
+        .contains(&result.as_str()))
+    }
 
     #[traced_test]
     #[test]
