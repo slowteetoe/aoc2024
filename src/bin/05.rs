@@ -1,4 +1,7 @@
-use std::collections::BTreeMap;
+use std::{cmp::Ordering, collections::BTreeMap};
+
+use itertools::Itertools;
+use tracing::instrument;
 
 advent_of_code::solution!(5);
 
@@ -48,12 +51,53 @@ pub fn part_one(input: &str) -> Option<u32> {
     Some(solution)
 }
 
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+#[instrument(skip(input))]
+pub fn part_two(input: &str) -> Option<u32> {
+    // complete rewrite for part 2 because my solution for 1 sucked.
+    // we can turn the ordering rules (a|b) into a comparator and just sort
+    let (rules, pages) = input.split_once("\n\n").expect("two parts");
+    let rules = rules
+        .lines()
+        .map(|line| {
+            let (a, b) = line.split_once("|").expect("a | b");
+            (a, b)
+        })
+        .collect_vec();
+    let pages = pages
+        .lines()
+        .map(|line| line.split(",").collect_vec())
+        .collect_vec();
+    let mut sum = 0u32;
+    for update in pages {
+        let sorted: Vec<&str> = update
+            .clone()
+            .iter()
+            .map(|s| *s)
+            .sorted_by(|a, b| {
+                if rules.contains(&(*a, *b)) {
+                    Ordering::Less
+                } else if rules.contains(&(*b, *a)) {
+                    Ordering::Greater
+                } else {
+                    Ordering::Equal
+                }
+            })
+            .collect();
+        if update != sorted {
+            sum += sorted
+                .get(sorted.len() / 2)
+                .expect("midpoint")
+                .parse::<u32>()
+                .expect("parse midpoint");
+        }
+    }
+    Some(sum)
 }
 
 #[cfg(test)]
 mod tests {
+    use tracing_test::traced_test;
+
     use super::*;
 
     #[test]
@@ -62,9 +106,10 @@ mod tests {
         assert_eq!(result, Some(143));
     }
 
+    #[traced_test]
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(123));
     }
 }
