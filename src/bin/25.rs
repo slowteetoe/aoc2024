@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -21,16 +20,6 @@ enum DeviceType {
 struct Device {
     r#type: DeviceType,
     pins: [i32; 5],
-}
-
-impl Device {
-    // not sure where I was going with this, think it's "does this key fit perfectly?" which is NOT what we were asked =/
-    fn fingerprint(&self) -> String {
-        match &self.r#type {
-            DeviceType::Lock => self.pins.iter().join(""),
-            DeviceType::Key => self.pins.iter().map(|pin| 6 - pin).join(""),
-        }
-    }
 }
 
 fn key(input: &str) -> IResult<&str, Device> {
@@ -104,18 +93,14 @@ pub fn part_one(input: &str) -> Option<u32> {
                 .any(|height| height > 5);
             if !collision {
                 ok += 1;
-            } else {
-                // println!(
-                //     "{:?} and key {:?} collide? {}",
-                //     lock.pins, key.pins, collision
-                // )
             }
         }
     }
     Some(ok)
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
+pub fn part_two(_input: &str) -> Option<u32> {
+    // there's never a part 2 for day 25 - it's always "get the other 49 stars"
     None
 }
 
