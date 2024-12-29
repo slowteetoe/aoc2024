@@ -1,126 +1,111 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+
+use itertools::Itertools;
 
 advent_of_code::solution!(6);
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Dir {
-    N,
-    S,
-    E,
-    W,
+    N = 0,
+    S = 1,
+    E = 2,
+    W = 3,
+}
+
+impl Dir {
+    // just because I like the name from Vec2
+    fn perp(&self) -> Self {
+        match self {
+            Dir::N => Dir::E,
+            Dir::S => Dir::W,
+            Dir::E => Dir::S,
+            Dir::W => Dir::N,
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct Guard {
     pos: (usize, usize),
     dir: Dir,
-    visited: BTreeSet<(usize, usize)>,
+    visited: BTreeSet<(usize, usize, Dir)>,
 }
 
-type Grid = Vec<Vec<char>>;
+struct Grid {
+    grid: BTreeMap<(usize, usize), char>,
+    dim_x: usize,
+    dim_y: usize,
+}
 
-pub fn build_grid(input: &str) -> (Guard, Grid) {
+fn build_grid(input: &str) -> (Guard, Grid) {
     let mut guard = None;
-    let grid = input
-        .lines()
-        .enumerate()
-        .map(|(row_num, line)| {
-            line.chars()
-                .enumerate()
-                .map(|(col_num, c)| {
-                    if c == '^' {
-                        guard = Some(Guard {
-                            pos: (col_num, row_num),
-                            dir: Dir::N,
-                            visited: BTreeSet::new(),
-                        });
-                    }
-                    c
-                })
-                .collect()
-        })
-        .collect();
-    (guard.unwrap(), grid)
+    let mut grid = BTreeMap::new();
+    input.lines().enumerate().for_each(|(row_num, line)| {
+        line.chars().enumerate().for_each(|(col_num, c)| {
+            if c == '^' {
+                guard = Some(Guard {
+                    pos: (col_num, row_num),
+                    dir: Dir::N,
+                    visited: BTreeSet::new(),
+                });
+            }
+            grid.insert((col_num, row_num), c);
+        });
+    });
+    (
+        guard.unwrap(),
+        Grid {
+            grid,
+            dim_x: input.lines().next().unwrap().len(),
+            dim_y: input.lines().count(),
+        },
+    )
 }
 
 impl Guard {
-    fn step(&mut self, grid: &Grid) -> Option<(usize, usize)> {
-        let mut next = self.pos;
-        // println!(
-        //     "at grid[{}][{}],  trying to go {:?}",
-        //     next.1, next.0, self.dir
-        // );
-        match self.dir {
+    fn step(&mut self, grid: &Grid) -> Option<((usize, usize), Dir)> {
+        // println!("at {:?}  trying to go {:?}", self.pos, self.dir);
+        // check bounds
+        let next = match self.dir {
             Dir::N => {
                 if self.pos.1 == 0 {
-                    // println!("Escaped to the N!!");
                     return None;
-                } else if self.pos.1 > 0 {
-                    // space to move in that direction
-                    next = (self.pos.0, self.pos.1 - 1);
-                    if grid[next.1][next.0] == '#' {
-                        // blocked, change direction but don't update pos or visited
-                        // println!("Blocked to the north, turning E");
-                        self.dir = Dir::E;
-                        return Some(next);
-                    }
-                    self.pos = next;
-                    self.visited.insert(next);
+                } else {
+                    Some((self.pos.0, self.pos.1 - 1))
                 }
             }
             Dir::S => {
-                if self.pos.1 == grid.len() - 1 {
-                    // println!("Escaped to the S!!");
+                if self.pos.1 == grid.dim_y {
                     return None;
-                } else if self.pos.1 < grid.len() {
-                    // space to move in that direction
-                    next = (self.pos.0, self.pos.1 + 1);
-                    if grid[next.1][next.0] == '#' {
-                        // blocked, change direction but don't update pos or visited
-                        // println!("Blocked to the south, turning W");
-                        self.dir = Dir::W;
-                        return Some(next);
-                    }
-                    self.pos = next;
-                    self.visited.insert(next);
+                } else {
+                    Some((self.pos.0, self.pos.1 + 1))
                 }
             }
             Dir::E => {
-                if self.pos.0 == grid.len() - 1 {
-                    // println!("Escaped to the E!!");
+                if self.pos.1 == grid.dim_x {
                     return None;
-                } else if self.pos.0 < grid.len() {
-                    // space to move in that direction
-                    next = (self.pos.0 + 1, self.pos.1);
-                    if grid[next.1][next.0] == '#' {
-                        // blocked, change direction but don't update pos or visited
-                        // println!("Blocked to the east, turning S");
-                        self.dir = Dir::S;
-                        return Some(next);
-                    }
-                    self.pos = next;
-                    self.visited.insert(next);
+                } else {
+                    Some((self.pos.0 + 1, self.pos.1))
                 }
             }
             Dir::W => {
-                if self.pos.0 == 0 {
-                    // println!("Escaped to the W!!");
+                if self.pos.1 == 0 {
                     return None;
-                } else if self.pos.0 > 0 {
-                    // space to move in that direction
-                    next = (self.pos.0 - 1, self.pos.1);
-                    if grid[next.1][next.0] == '#' {
-                        // blocked, change direction but don't update pos or visited
-                        // println!("Blocked to the west, turning N");
-                        self.dir = Dir::N;
-                        return Some(next);
-                    }
-                    self.pos = next;
-                    self.visited.insert(next);
+                } else {
+                    Some((self.pos.0 - 1, self.pos.1))
                 }
             }
         }
-        Some(next)
+        .unwrap();
+        // insert here so we don't have to subtract out the exit
+        self.visited.insert((self.pos.0, self.pos.1, self.dir));
+
+        if grid.grid.get(&next) == Some(&'#') {
+            self.dir = self.dir.perp();
+            return Some((next, self.dir));
+        }
+        self.pos = next;
+        Some((next, self.dir))
     }
 }
 
@@ -131,10 +116,28 @@ pub fn part_one(input: &str) -> Option<u32> {
         // println!("went to {},{}", next.0, next.1);
     }
 
-    Some(guard.visited.iter().len() as u32 + 1) // add in final step
+    let unique = guard
+        .visited
+        .iter()
+        .map(|(x, y, _)| (x, y))
+        .unique()
+        .count();
+
+    // off by one somewhere - solution needs 5404 but gets 5403 unless I add in 1 (but example gets 42 if add in 1, and should be 41)
+    Some(unique as u32)
 }
 
-pub fn part_two(_input: &str) -> Option<u32> {
+// 16k empty spaces, so can't just randomly pick one... have to be smarter
+// actually since the solution to part one was 5404, only that many to randomly choose from
+// p1 kept track of locations visited, but not direction - since we're looking for loops, will need to take
+// direction into account also I think...
+pub fn part_two(input: &str) -> Option<u32> {
+    let (mut guard, grid) = build_grid(input);
+
+    while let Some(_next) = guard.step(&grid) {
+        // println!("went to {},{}", next.0, next.1);
+    }
+
     None
 }
 
@@ -151,6 +154,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(6));
     }
 }
