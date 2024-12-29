@@ -1,5 +1,5 @@
 use bmp::{
-    consts::{BLACK, BLUE, RED, WHITE_SMOKE},
+    consts::{BLACK, BLUE, LIME_GREEN, ORANGE, ORANGE_RED, RED, WHITE_SMOKE},
     Image,
 };
 use glam::IVec2;
@@ -14,6 +14,8 @@ enum Contents {
     Wall,
     Robot,
     Box,
+    LeftBox,
+    RightBox,
 }
 
 #[derive(Debug)]
@@ -24,6 +26,33 @@ struct Grid {
 }
 
 impl Grid {
+    fn expand(&mut self) {
+        let mut new_contents = vec![];
+        for c in self.contents.iter() {
+            match c {
+                Contents::EmptySpace => {
+                    new_contents.push(Contents::EmptySpace);
+                    new_contents.push(Contents::EmptySpace);
+                }
+                Contents::Wall => {
+                    new_contents.push(Contents::Wall);
+                    new_contents.push(Contents::Wall);
+                }
+                Contents::Robot => {
+                    new_contents.push(Contents::Robot);
+                    new_contents.push(Contents::EmptySpace);
+                }
+                Contents::Box => {
+                    new_contents.push(Contents::LeftBox);
+                    new_contents.push(Contents::RightBox);
+                }
+                _ => unreachable!("no [ or ] on unexpanded grid"),
+            }
+        }
+        self.contents = new_contents;
+        self.dim.x *= 2; // we only expanded vertically
+    }
+
     fn try_move(&mut self, instruction: &Movement) -> Option<IVec2> {
         let mut next_pos = self.robot.clone() + instruction.delta();
         let mut next = self.pos_to_index(next_pos);
@@ -72,10 +101,7 @@ impl Grid {
     }
 
     fn create_image(&self, img_name: &str) {
-        let mut img: Image = Image::new(50, 50);
-        if cfg!(test) {
-            img = Image::new(10, 10);
-        }
+        let mut img: Image = Image::new(self.dim.x as u32, self.dim.y as u32);
 
         for (x, y) in img.coordinates() {
             img.set_pixel(x, y, BLACK);
@@ -91,8 +117,10 @@ impl Grid {
 
                 match c {
                     Contents::Wall => img.set_pixel(x, y, WHITE_SMOKE),
-                    Contents::Robot => img.set_pixel(x, y, RED),
+                    Contents::Robot => img.set_pixel(x, y, LIME_GREEN),
                     Contents::Box => img.set_pixel(x, y, BLUE),
+                    Contents::LeftBox => img.set_pixel(x, y, ORANGE),
+                    Contents::RightBox => img.set_pixel(x, y, ORANGE_RED),
                     _ => unreachable!(),
                 }
             });
@@ -196,7 +224,10 @@ pub fn part_one(input: &str) -> Option<u32> {
     Some(grid.gps_score())
 }
 
-pub fn part_two(_input: &str) -> Option<u32> {
+pub fn part_two(input: &str) -> Option<u32> {
+    let (mut grid, _instructions) = parse_input(input);
+    grid.expand();
+    grid.create_image("expanded");
     None
 }
 
