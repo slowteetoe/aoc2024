@@ -2,7 +2,7 @@ use bmp::{
     consts::{BLACK, BLUE, RED, WHITE_SMOKE},
     Image,
 };
-use glam::UVec2;
+use glam::IVec2;
 use itertools::Itertools;
 use std::collections::VecDeque;
 
@@ -18,142 +18,57 @@ enum Contents {
 
 #[derive(Debug)]
 struct Grid {
-    dim: UVec2,
+    dim: IVec2,
     contents: Vec<Contents>,
-    robot: UVec2,
+    robot: IVec2,
 }
 
 impl Grid {
-    /// returns Some(current robot position) if able to move, None otherwise
-    fn execute(&mut self, instruction: &Movement) -> Option<UVec2> {
-        match instruction {
-            Movement::Up => self.try_move_up(self.robot),
-            Movement::Right => self.try_move_right(self.robot),
-            Movement::Down => self.try_move_down(self.robot),
-            Movement::Left => self.try_move_left(self.robot),
-        }
-    }
-
-    fn try_move_up(&mut self, pos: UVec2) -> Option<UVec2> {
-        let mut next_pos = pos.clone();
-        next_pos.y -= 1;
-        let mut next = self.xy_to_index(next_pos.x, next_pos.y);
+    fn try_move(&mut self, instruction: &Movement) -> Option<IVec2> {
+        let mut next_pos = self.robot.clone() + instruction.delta();
+        let mut next = self.pos_to_index(next_pos);
         let mut queue = VecDeque::new();
         while next_pos.y > 0
+            && next_pos.x > 0
+            && next_pos.y < self.dim.y
+            && next_pos.x < self.dim.x
             && self.contents[next] != Contents::Wall
             && self.contents[next] != Contents::EmptySpace
         {
             queue.push_front(self.contents[next]);
-            next_pos.y -= 1;
-            next = self.xy_to_index(next_pos.x, next_pos.y);
+            next_pos += instruction.delta();
+            next = self.pos_to_index(next_pos);
         }
-        if next_pos.y < 1 || self.contents[next] == Contents::Wall {
-            // ran out of room, nothing to do
-            None
-        } else {
-            let delta = self.dim.x as usize; // one row vertically
-                                             // since we have a spot to put stuff, unwind the stack
-            while !queue.is_empty() {
-                self.contents[next] = queue.pop_front().expect("missing content");
-                next += delta;
-            }
-            // move the robot itself, since it was on a robot square it's now empty
-            self.contents[next] = Contents::Robot;
-            self.contents[next + delta] = Contents::EmptySpace;
-            self.robot.y -= 1;
-            Some(self.robot)
-        }
-    }
-    fn try_move_down(&mut self, pos: UVec2) -> Option<UVec2> {
-        let mut next_pos = pos.clone();
-        next_pos.y += 1;
-        let mut next = self.xy_to_index(next_pos.x, next_pos.y);
-        let mut queue = VecDeque::new();
-        while next_pos.y <= self.dim.y
-            && self.contents[next] != Contents::Wall
-            && self.contents[next] != Contents::EmptySpace
+        if next_pos.y < 1
+            || next_pos.x < 1
+            || next_pos.y > self.dim.y
+            || next_pos.x > self.dim.x
+            || self.contents[next] == Contents::Wall
         {
-            queue.push_front(self.contents[next]);
-            next_pos.y += 1;
-            next = self.xy_to_index(next_pos.x, next_pos.y);
-        }
-        if next_pos.y > self.dim.y || self.contents[next] == Contents::Wall {
+            // ran out of space, don't move any boxes
             None
         } else {
-            let delta = self.dim.x as usize; // one row vertically
-                                             // since we have a spot to put stuff, unwind the stack
+            // unwind the queue, placing the boxes
             while !queue.is_empty() {
                 self.contents[next] = queue.pop_front().expect("missing content");
-                next -= delta;
+                next_pos -= instruction.delta();
+                next = self.pos_to_index(next_pos);
             }
-            // move the robot itself, since it was on a robot square it's now empty
-            self.contents[next] = Contents::Robot;
-            self.contents[next - delta] = Contents::EmptySpace;
-            self.robot.y += 1;
+            // move the robot to the new location, setting the original position to empty
+            let original_robot_location = self.pos_to_index(self.robot);
+            self.contents[original_robot_location] = Contents::EmptySpace;
+
+            self.robot += instruction.delta();
+
+            let new_robot_location = self.pos_to_index(self.robot);
+            self.contents[new_robot_location] = Contents::Robot;
+
             Some(self.robot)
         }
     }
 
-    fn try_move_left(&mut self, pos: UVec2) -> Option<UVec2> {
-        let mut next_pos = pos.clone();
-        next_pos.x -= 1;
-        let mut next = self.xy_to_index(next_pos.x, next_pos.y);
-        let mut queue = VecDeque::new();
-        while next_pos.x > 0
-            && self.contents[next] != Contents::Wall
-            && self.contents[next] != Contents::EmptySpace
-        {
-            queue.push_front(self.contents[next]);
-            next_pos.x -= 1;
-            next = self.xy_to_index(next_pos.x, next_pos.y);
-        }
-        if next_pos.x < 1 || self.contents[next] == Contents::Wall {
-            None
-        } else {
-            // since we have a spot to put stuff, unwind the stack
-            while !queue.is_empty() {
-                self.contents[next] = queue.pop_front().expect("missing content");
-                next += 1;
-            }
-            // move the robot itself, since it was on a robot square it's now empty
-            self.contents[next] = Contents::Robot;
-            self.contents[next + 1] = Contents::EmptySpace;
-            self.robot.x -= 1;
-            Some(self.robot)
-        }
-    }
-
-    fn try_move_right(&mut self, pos: UVec2) -> Option<UVec2> {
-        let mut next_pos = pos.clone();
-        next_pos.x += 1;
-        let mut next = self.xy_to_index(next_pos.x, next_pos.y);
-        let mut queue = VecDeque::new();
-        while next_pos.x < self.dim.x
-            && self.contents[next] != Contents::Wall
-            && self.contents[next] != Contents::EmptySpace
-        {
-            queue.push_front(self.contents[next]);
-            next_pos.x += 1;
-            next = self.xy_to_index(next_pos.x, next_pos.y);
-        }
-        if next_pos.x >= self.dim.x || self.contents[next] == Contents::Wall {
-            None
-        } else {
-            // since we have a spot to put stuff, unwind the stack
-            while !queue.is_empty() {
-                self.contents[next] = queue.pop_front().expect("missing content");
-                next -= 1;
-            }
-            // move the robot itself, since it was on a robot square it's now empty
-            self.contents[next] = Contents::Robot;
-            self.contents[next - 1] = Contents::EmptySpace;
-            self.robot.x += 1;
-            Some(self.robot)
-        }
-    }
-
-    fn xy_to_index(&self, x: u32, y: u32) -> usize {
-        (y as usize * self.dim.x as usize) + x as usize
+    fn pos_to_index(&self, pos: IVec2) -> usize {
+        (pos.y as usize * self.dim.x as usize) + pos.x as usize
     }
 
     fn create_image(&self, img_name: &str) {
@@ -191,8 +106,8 @@ impl Grid {
             .enumerate()
             .fold(0, |acc, (idx, contents)| {
                 if *contents == Contents::Box {
-                    let (y, x) = (idx as u32 / self.dim.x, idx as u32 % self.dim.x);
-                    acc + (100 * y) + x
+                    let (y, x) = (idx as i32 / self.dim.x, idx as i32 % self.dim.x);
+                    acc + ((100 * y) + x) as u32
                 } else {
                     acc
                 }
@@ -206,6 +121,17 @@ enum Movement {
     Right,
     Down,
     Left,
+}
+
+impl Movement {
+    fn delta(&self) -> IVec2 {
+        match self {
+            Movement::Up => IVec2::NEG_Y,
+            Movement::Right => IVec2::X,
+            Movement::Down => IVec2::Y,
+            Movement::Left => IVec2::NEG_X,
+        }
+    }
 }
 
 fn parse_input(input: &str) -> (Grid, Vec<Movement>) {
@@ -226,14 +152,14 @@ fn parse_input(input: &str) -> (Grid, Vec<Movement>) {
         });
     });
 
-    let dim = UVec2::new((parsed_grid.len() / grid_y) as u32, grid_y as u32);
+    let dim = IVec2::new((parsed_grid.len() / grid_y) as i32, grid_y as i32);
     let robot_pos = parsed_grid
         .iter()
         .position(|c| *c == Contents::Robot)
         .and_then(|pos| {
-            Some(UVec2::new(
-                pos as u32 % dim.x as u32,
-                pos as u32 / dim.y as u32,
+            Some(IVec2::new(
+                pos as i32 % dim.x as i32,
+                pos as i32 / dim.y as i32,
             ))
         })
         .expect("couldn't find robot");
@@ -261,16 +187,16 @@ fn parse_input(input: &str) -> (Grid, Vec<Movement>) {
 
 pub fn part_one(input: &str) -> Option<u32> {
     let (mut grid, instructions) = parse_input(input);
-    instructions.iter().enumerate().for_each(|(idx, instr)| {
-        grid.execute(instr);
-        if cfg!(test) {
-            grid.create_image(&format!("{:04}", idx));
-        }
+    instructions.iter().enumerate().for_each(|(_idx, instr)| {
+        grid.try_move(instr);
+        // if cfg!(test) {
+        //     grid.create_image(&format!("{:04}", idx));
+        // }
     });
     Some(grid.gps_score())
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
+pub fn part_two(_input: &str) -> Option<u32> {
     None
 }
 
