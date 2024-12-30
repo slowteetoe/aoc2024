@@ -255,8 +255,15 @@ mod tests {
     #[case("v<<A>>^A<A>AvA<^AA>A<vAAA>^A", 68)]
     #[case("v<<A>^>A<A>AvA<^AA>Av<AAA^>A", 68)]
     fn test_shortest_paths_have_same_lens(#[case] input: &str, #[case] expected_len: usize) {
+        // ?! case 2 and 3 are equivalent paths, but when I generate this path, case 2 has 68 chars and case 3 has 70 chars, how is that even possible/
         let result = numerical_to_directional_movements(input);
-        assert_eq!(result.len(), expected_len);
+        assert_eq!(
+            result.len(),
+            expected_len,
+            "input of {} generated {}",
+            input,
+            result
+        );
     }
 
     #[traced_test]
