@@ -1,14 +1,9 @@
-use std::{collections::BTreeMap, iter::once};
+use std::iter::once;
 
 use itertools::Itertools;
 use memoize::memoize;
 use pathfinding::prelude::astar;
-use petgraph::{
-    dot::{Config, Dot},
-    graph::DiGraph,
-    prelude::DiGraphMap,
-};
-use tracing::{debug, instrument};
+use tracing::instrument;
 
 advent_of_code::solution!(21);
 
@@ -53,17 +48,16 @@ fn next_step_on_numeric_keypad(start: char, end: char) -> Vec<char> {
 #[memoize]
 fn next_step_on_directional_keypad(start: char, end: char) -> Vec<char> {
     let (path, _cost) = astar(
-        &(start, 'X'),
+        &(start, 'A'),
         |p| match p.0 {
             'A' => vec![(('^', '<'), 1), (('>', 'v'), 1)],
             '<' => vec![(('v', '>'), 1)],
-            '^' => vec![(('A', '>'), 1), (('v', 'v'), 1)],
+            '^' => vec![(('v', 'v'), 1), (('A', '>'), 1)],
             '>' => vec![(('v', '<'), 1), (('A', '^'), 1)],
             'v' => vec![(('<', '<'), 1), (('^', '^'), 1), (('>', '>'), 1)],
-            'X' => vec![],
             _ => unreachable!(),
         },
-        |_| 0,
+        |_| 2,
         |p| p.0 == end,
     )
     .expect("should have been a path");
@@ -97,79 +91,80 @@ fn code_to_numerical_movements(code: &Vec<char>) -> String {
 }
 
 fn numerical_to_directional_movements(numerical_movements: &str) -> String {
-    let m = "A".to_owned() + numerical_movements;
     let mut movements = vec![];
-    m.chars().tuple_windows().for_each(|(start, end)| {
-        let mut next = next_step_on_directional_keypad(start, end);
-        // wth?
-        // println!("going from {end} to {start} is {:?}", next);
-        if next.len() != 0 {
-            next = next[1..].to_vec();
-        }
-        next.push('A');
-        movements.append(&mut next);
-    });
+    once('A')
+        .chain(numerical_movements.chars())
+        .tuple_windows()
+        .for_each(|(start, end)| {
+            let mut next = next_step_on_directional_keypad(start, end);
+            // wth?
+            // println!("going from {end} to {start} is {:?}", next);
+            if next.len() != 0 {
+                next = next[1..].to_vec();
+            }
+            next.push('A');
+            movements.append(&mut next);
+        });
     movements.iter().join("")
 }
 
-fn push_buttons(input: Vec<char>) -> String {
-    // let mut nodes = BTreeMap::<char, u32>::new();
-    // nodes.insert('A', 0);
-    // nodes.insert('^', 1);
-    // nodes.insert('>', 2);
-    // nodes.insert('v', 3);
-    // nodes.insert('<', 4);
-    let g = DiGraphMap::<&str, ()>::from_edges(&[
-        // (0, 1),
-        // (0, 2), // A
-        // (1, 3),
-        // (1, 0), // ^
-        // (2, 0),
-        // (2, 3), // >
-        // (3, 4),
-        // (3, 1),
-        // (3, 2), // v
-        // (4, 3), // <
-        ("A", "^"),
-        ("A", ">"),
-        ("^", "A"),
-        ("^", "v"),
-        (">", "A"),
-        (">", "v"),
-        ("v", "<"),
-        ("v", "^"),
-        ("v", ">"),
-        ("<", "v"),
-    ]);
-    println!("{:?}", Dot::new(&g));
-    let mut curr = g.nodes().find(|n| *n == "A").expect("root node");
-    let output: Vec<_> = input
-        .iter()
-        .map(|c| {
-            let c = c.to_string();
-            if c == "A" {
-                curr
-            } else {
-                let mut outbound = g.edges_directed(curr, petgraph::Direction::Outgoing);
-                println!("on {}, looking at {:?} for {}", curr, outbound, c);
-                if let Some(outbound_node) = outbound.find(|e| e.0 == curr && e.1 == c) {
-                    curr = outbound_node.1;
-                    outbound_node.0
-                } else {
-                    panic!("nope")
-                }
-            }
-        })
-        .collect();
-    output.iter().join("")
-}
+// fn push_buttons(input: Vec<char>) -> String {
+//     // let mut nodes = BTreeMap::<char, u32>::new();
+//     // nodes.insert('A', 0);
+//     // nodes.insert('^', 1);
+//     // nodes.insert('>', 2);
+//     // nodes.insert('v', 3);
+//     // nodes.insert('<', 4);
+//     let g = DiGraphMap::<&str, ()>::from_edges(&[
+//         // (0, 1),
+//         // (0, 2), // A
+//         // (1, 3),
+//         // (1, 0), // ^
+//         // (2, 0),
+//         // (2, 3), // >
+//         // (3, 4),
+//         // (3, 1),
+//         // (3, 2), // v
+//         // (4, 3), // <
+//         ("A", "^"),
+//         ("A", ">"),
+//         ("^", "A"),
+//         ("^", "v"),
+//         (">", "A"),
+//         (">", "v"),
+//         ("v", "<"),
+//         ("v", "^"),
+//         ("v", ">"),
+//         ("<", "v"),
+//     ]);
+//     println!("{:?}", Dot::new(&g));
+//     let mut curr = g.nodes().find(|n| *n == "A").expect("root node");
+//     let output: Vec<_> = input
+//         .iter()
+//         .map(|c| {
+//             let c = c.to_string();
+//             if c == "A" {
+//                 curr
+//             } else {
+//                 let mut outbound = g.edges_directed(curr, petgraph::Direction::Outgoing);
+//                 println!("on {}, looking at {:?} for {}", curr, outbound, c);
+//                 if let Some(outbound_node) = outbound.find(|e| e.0 == curr && e.1 == c) {
+//                     curr = outbound_node.1;
+//                     outbound_node.0
+//                 } else {
+//                     panic!("nope")
+//                 }
+//             }
+//         })
+//         .collect();
+//     output.iter().join("")
+// }
 
 #[instrument(skip(input))]
 pub fn part_one(input: &str) -> Option<u32> {
     let codes = parse(input);
     let solutions = codes
         .iter()
-        .take(1)
         .map(|code| (code, code_to_numerical_movements(&code)))
         .inspect(|(code, m)| {
             println!("{:?}: {:?}", code, m);
@@ -240,37 +235,59 @@ mod tests {
         assert_eq!(expected.len(), result.len())
     }
 
-    #[test]
-    fn test_pushing_buttons() {
-        let code = "<A^A^^>AvvvA".chars().collect_vec();
-        let result = push_buttons(code);
-        assert_eq!("", result);
-    }
-
     #[traced_test]
     #[test]
     fn test_numerical_to_movements() {
         let result = numerical_to_directional_movements("<A^A>^^AvvvA");
-        // these are both valid paths
+        // these are all valid paths
         assert!([
             "v<<A>^>A<A>A<AAv>A^Av<AAA^>A",
             "v<<A>>^A<A>AvA<^AA>A<vAAA>^A",
             "v<<A>^>A<A>AvA<^AA>Av<AAA^>A"
         ]
         .contains(&result.as_str()));
-        // assert_eq!(result, "v<<A>>^A<A>AvA<^AA>A<vAAA>^A")
+        assert_eq!(result, "v<<A>^>A<A>AvA<^AA>Av<AAA^>A")
+    }
+
+    #[rstest]
+    #[test]
+    #[case("v<<A>^>A<A>A<AAv>A^Av<AAA^>A", 68)]
+    #[case("v<<A>>^A<A>AvA<^AA>A<vAAA>^A", 68)]
+    #[case("v<<A>^>A<A>AvA<^AA>Av<AAA^>A", 68)]
+    fn test_shortest_paths_have_same_lens(#[case] input: &str, #[case] expected_len: usize) {
+        let result = numerical_to_directional_movements(input);
+        assert_eq!(result.len(), expected_len);
     }
 
     #[traced_test]
+    #[rstest]
     #[test]
-    fn test_second_round_of_movements() {
-        let result = numerical_to_directional_movements("v<<A>>^A<A>AvA<^AA>A<vAAA>^A");
+    #[case("v<<A>>^A<A>AvA<^AA>A<vAAA>^A", vec![
+        "v<A<AA>^>AvAA<^A>Av<<A>^>AvA^Av<A^>Av<<A>^A>AAvA^Av<<A>A^>AAAvA<^A>A",
+        "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A",
+    ])]
+    //"v<<A>^>A<A>A<AAv>A^Av<AAA^>A"
+    // AAAAAAAAARGH!!!!
+    #[case("v<<A>^>A", vec!["v<A<AA>^>AvA<^Av>A^A"])]
+    #[case("v<<A>^>A<", vec!["v<A<AA>^>AvA<^Av>A^Av<<A"])]
+    #[case("v<<A>^>A<AA", vec!["v<A<AA>^>AvA<^Av>A^Av<<A>^>AA"])]
+    #[case("v<<A>^>A<AAv>A", vec!["v<A<AA>^>AvA<^Av>A^Av<<A>^>AAv<A>A^A"])]
+    #[case("v<<A>^>A<AAv>A^A", vec!["v<A<AA>^>AvA<^Av>A^Av<<A>^>AAv<A>A^A<A>A"])]
+    #[case("v<<A>^>A<AAv>A^Av<AAA", vec!["v<A<AA>^>AvA<^Av>A^Av<<A>^>AAv<A>A^A<A>Av<A<A>^>AAA"])]
+    #[case("v<<A>^>A<AAv>A^Av<AAAvA", vec!["v<A<AA>^>AvA<^Av>A^Av<<A>^>AAv<A>A^A<A>Av<A<A>^>AAAv<A^>A"])]
+    #[case("v<<A>^>A<AAv>A^Av<AAAvA<^A", vec!["v<A<AA>^>AvA<^Av>A^Av<<A>^>AAv<A>A^A<A>Av<A<A>^>AAAv<A^>Av<<A>^A>A"])]
+    #[case("v<<A>^>A<AAv>A^Av<AAAvA<^A>A", vec!["v<A<AA>^>AvA<^Av>A^Av<<A>^>AAv<A>A^A<A>Av<A<A>^>AAAv<A^>Av<<A>^A>AvA^A"])]
+    // here's what we actualy see for 029A
+    #[case("v<<A>^>A<A>AvA<^AA>Av<AAA^>A", vec![""])]
+    fn test_second_round_of_movements(#[case] input: &str, #[case] possible_solutions: Vec<&str>) {
+        let result = numerical_to_directional_movements(input);
         // equivalent paths
-        assert!([
-            "v<A<AA>^>AvAA<^A>Av<<A>^>AvA^Av<A^>Av<<A>^A>AAvA^Av<<A>A^>AAAvA<^A>A",
-            "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A",
-        ]
-        .contains(&result.as_str()))
+        assert!(
+            possible_solutions.contains(&result.as_str()),
+            "{} was actually {}",
+            input,
+            result
+        )
     }
 
     #[traced_test]
