@@ -1,11 +1,17 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    fs,
+};
 
+use derive_more::derive::Display;
 use itertools::Itertools;
+use petgraph::{dot::Dot, Graph};
+use std::fmt::Display;
 use tracing::debug;
 
 advent_of_code::solution!(24);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Display)]
 enum Logic {
     And,
     Or,
@@ -18,6 +24,12 @@ struct Gate {
     a: String,
     b: String,
     out: String,
+}
+
+impl Display for Gate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {:?} {}", self.a, self.logic, self.b)
+    }
 }
 
 fn parse_input(input: &str) -> (BTreeMap<&str, bool>, Vec<Gate>) {
@@ -88,63 +100,28 @@ fn simulate(wires: &BTreeMap<&str, bool>, gates: &Vec<Gate>) -> u64 {
     output
 }
 
-fn normalize(gates: &mut Vec<Gate>) {
-    let mut remaps = BTreeMap::<String, String>::new();
-    let mut queue = VecDeque::from_iter(gates.iter_mut());
+/// turn into a graph and build a graphviz file
+pub fn visualize(wires: BTreeMap<&str, bool>, gates: Vec<Gate>) -> Graph<String, String> {
+    let mut graph = Graph::<String, String>::new();
+    let mut nodemap = BTreeMap::new();
 
-    let mut guard = 0;
-    while let Some(g) = queue.pop_front() {
-        if guard > 10000 {
-            break;
-        }
-        guard += 1;
-        match (
-            g.a.starts_with("x"),
-            g.b.starts_with("y"),
-            g.out.starts_with("z"),
-        ) {
-            (false, false, false) => queue.push_back(g),
-            (true, true, true) => continue,
-            (true, true, false) => {
-                if remaps.contains_key(&g.out) {
-                    g.out = remaps.get(&g.out).unwrap().to_owned();
-                    continue;
-                } else {
-                    remaps.insert(g.out.clone(), g.a.replace("x", "z"));
-                    queue.push_back(g);
-                }
-            }
-            (true, false, true) => {
-                if remaps.contains_key(&g.b) {
-                    g.b = remaps.get(&g.b).unwrap().to_owned();
-                } else {
-                    remaps.insert(g.b.clone(), g.a.replace("x", "y"));
-                    queue.push_back(g);
-                }
-            }
-            (false, true, true) => {
-                if remaps.contains_key(&g.out) {
-                    g.out = remaps.get(&g.out).unwrap().to_owned();
-                } else {
-                    remaps.insert(g.a.clone(), g.b.replace("y", "x"));
-                    queue.push_back(g);
-                }
-            }
-            (false, false, true) => {
-                if remaps.contains_key(&g.a) {
-                    g.a = remaps.get(&g.a).unwrap().to_owned();
-                }
-                if remaps.contains_key(&g.b) {
-                    g.b = remaps.get(&g.b).unwrap().to_owned();
-                }
-                queue.push_back(g);
-            }
-            _ => {
-                println!("don't know what to do with {:?}", g);
-                queue.push_back(g);
-            }
-        }
+    for gate in gates.iter() {
+        let op_node = graph.add_node(gate.logic.to_string()); // always add op node
+        let a = *nodemap
+            .entry(&gate.a)
+            .or_insert_with(|| graph.add_node(gate.a.clone()));
+        let b = *nodemap
+            .entry(&gate.b)
+            .or_insert_with(|| graph.add_node(gate.b.clone()));
+        let out = *nodemap
+            .entry(&gate.out)
+            .or_insert_with(|| graph.add_node(gate.out.clone()));
+
+        graph.extend_with_edges(&[(a, op_node), (b, op_node), (op_node, out)]);
     }
+    let data = format!("{:?}", Dot::new(&graph));
+    fs::write("data/images/day-24.dot", data).expect("Unable to write file");
+    graph
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
@@ -155,10 +132,8 @@ pub fn part_one(input: &str) -> Option<u64> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    let (wires, mut gates) = parse_input(input);
-    println!("BEFORE {:?}", &gates);
-    normalize(&mut gates);
-    println!("AFTER {:?}", &gates);
+    let (wires, gates) = parse_input(input);
+    visualize(wires, gates);
     None
 }
 
@@ -175,6 +150,7 @@ mod tests {
         assert_eq!(result, Some(4));
     }
 
+    #[traced_test]
     #[test]
     fn test_part_two() {
         let result = part_two(
